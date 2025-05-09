@@ -16,6 +16,7 @@ import BacklogItems from './BacklogItems';
 // Game component imports - these should point to the actual game files
 import PongGame from './games/PongGame'; 
 import RacingGame from './games/RacingGame';
+import ZombieGame from './games/ZombieGame';
 
 const SOCKET_SERVER_URL = 'http://localhost:4001';
 const fibonacciNumbers = [0, 1, 2, 3, 5, 8, 13, 21, '☕', '?'];
