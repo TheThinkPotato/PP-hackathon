@@ -40,3 +40,4 @@ logs/
 
 # TypeScript cache
 *.tsbuildinfo 
+/.vs
