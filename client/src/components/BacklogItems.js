@@ -93,38 +93,7 @@ const BacklogItems = ({ currentRound, allVotes, players, revealed, isSessionComp
 
   return (
     <Box sx={{ width: '100%' }}>
-      {previousItems.length > 0 && (
-        <Box mb={3}>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.dark', mb: 1.5 }}>
-            Previously Voted Items
-          </Typography>
-          {previousItems.map((item, index) => {
-            const itemKey = `item_${index + 1}`;
-            const itemVoteData = allVotes[itemKey];
-            return (
-              <Paper key={item.id} elevation={1} sx={{ mb: 1.5, p: 1.5, borderRadius: '6px', border: '1px solid', borderColor: 'divider' }}>
-                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>{item.title}</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>{item.description}</Typography>
-                <Typography variant="caption" display="block" color="text.secondary">Priority: {item.priority}</Typography>
-                <Typography variant="subtitle2" display="block" sx={{ mt: 0.5, fontWeight: 'bold', color: 'secondary.dark' }}>
-                  Final Score: {itemVoteData?.winningNumber !== undefined && itemVoteData?.winningNumber !== null ? itemVoteData.winningNumber : '-'}
-                </Typography>
-                {itemVoteData?.votes && Object.keys(itemVoteData.votes).length > 0 && (
-                  <Box mt={1}>
-                    <Typography variant="caption" sx={{ fontWeight: 'medium' }}>Votes:</Typography>
-                    {Object.entries(itemVoteData.votes).map(([player, vote]) => (
-                      <Typography key={player} variant="caption" display="block" sx={{ pl: 1, fontSize: '0.75rem' }}>
-                        {player}: <strong>{vote}</strong>
-                      </Typography>
-                    ))}
-                  </Box>
-                )}
-              </Paper>
-            );
-          })}
-          <Divider sx={{ my: 2 }}/>
-        </Box>
-      )}
+     
 
       {currentItem && (
         <Box>
@@ -182,6 +151,39 @@ const BacklogItems = ({ currentRound, allVotes, players, revealed, isSessionComp
           {revealed && Object.keys(currentItemVotes).length === 0 && (
              <Typography variant="body2" color="text.secondary" sx={{mt: 1, fontStyle: 'italic'}}>No votes recorded for the current item yet.</Typography>
           )}
+        </Box>
+      )}
+
+{previousItems.length > 0 && (
+        <Box mb={3}>
+          <Typography variant="h6" gutterBottom sx={{ color: 'primary.dark', mb: 1.5 }}>
+            Previously Voted Items
+          </Typography>
+          {previousItems.map((item, index) => {
+            const itemKey = `item_${index + 1}`;
+            const itemVoteData = allVotes[itemKey];
+            return (
+              <Paper key={item.id} elevation={1} sx={{ mb: 1.5, p: 1.5, borderRadius: '6px', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>{item.title}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>{item.description}</Typography>
+                <Typography variant="caption" display="block" color="text.secondary">Priority: {item.priority}</Typography>
+                <Typography variant="subtitle2" display="block" sx={{ mt: 0.5, fontWeight: 'bold', color: 'secondary.dark' }}>
+                  Final Score: {itemVoteData?.winningNumber !== undefined && itemVoteData?.winningNumber !== null ? itemVoteData.winningNumber : '-'}
+                </Typography>
+                {itemVoteData?.votes && Object.keys(itemVoteData.votes).length > 0 && (
+                  <Box mt={1}>
+                    <Typography variant="caption" sx={{ fontWeight: 'medium' }}>Votes:</Typography>
+                    {Object.entries(itemVoteData.votes).map(([player, vote]) => (
+                      <Typography key={player} variant="caption" display="block" sx={{ pl: 1, fontSize: '0.75rem' }}>
+                        {player}: <strong>{vote}</strong>
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+              </Paper>
+            );
+          })}
+          <Divider sx={{ my: 2 }}/>
         </Box>
       )}
     </Box>
