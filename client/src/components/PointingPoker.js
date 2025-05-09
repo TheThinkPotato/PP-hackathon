@@ -11,6 +11,7 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Alert from '@mui/material/Alert';
+import BacklogItems from './BacklogItems';
 
 // Game component imports - these should point to the actual game files
 import PongGame from './games/PongGame'; 
@@ -36,6 +37,8 @@ const PointingPoker = () => {
   const [currentGame, setCurrentGame] = useState(null);
   const [winningNumber, setWinningNumber] = useState(null);
   const [currentRound, setCurrentRound] = useState(1);
+  const [backlogVotes, setBacklogVotes] = useState({});
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
 
   const resetPokerStateForNewRound = useCallback(() => {
     setMyVote(null);
@@ -99,18 +102,24 @@ const PointingPoker = () => {
       setRevealed(updatedRevealed || false);
     });
 
-    newSocket.on('roundResults', ({ teams: newTeams, winningNumber: newWinningNumber }) => {
-      console.log('Round results:', newTeams, newWinningNumber);
+    newSocket.on('roundResults', ({ teams: newTeams, winningNumber: newWinningNumber, itemVotes }) => {
+      console.log('Round results:', newTeams, newWinningNumber, itemVotes);
       setTeams(newTeams || null);
       setWinningNumber(newWinningNumber || null);
       setRevealed(true);
       setCurrentGame(null);
+      if (itemVotes) {
+        setBacklogVotes(itemVotes);
+      }
     });
 
-    newSocket.on('startNextRound', ({ round }) => {
+    newSocket.on('startNextRound', ({ round, itemVotes }) => {
       console.log('Server started next round:', round);
       resetPokerStateForNewRound();
       setCurrentRound(round);
+      if (itemVotes) {
+        setBacklogVotes(itemVotes);
+      }
       setErrorMessage('');
     });
     
@@ -156,7 +165,12 @@ const PointingPoker = () => {
   const handleVote = (number) => {
     if (socket && isRoomJoined && !revealed && userName && roomCode) {
       setMyVote(number);
-      socket.emit('vote', { roomCode, userName, vote: number });
+      socket.emit('vote', { 
+        roomCode, 
+        userName, 
+        vote: number,
+        itemId: `item_${currentRound}`
+      });
     }
   };
 
@@ -168,14 +182,26 @@ const PointingPoker = () => {
 
   const handleGameEnd = useCallback((chosenNumber) => {
     if (socket && isRoomJoined && roomCode && !winningNumber) {
+      setBacklogVotes(prev => ({
+        ...prev,
+        [`item_${currentRound}`]: {
+          votes: allVotes,
+          winningNumber: chosenNumber
+        }
+      }));
+
       socket.emit('gameEnded', { roomCode, winningNumber: chosenNumber });
     }
-  }, [socket, isRoomJoined, roomCode, winningNumber]);
+  }, [socket, isRoomJoined, roomCode, winningNumber, currentRound, allVotes]);
 
   const handleNextRound = () => {
     if (socket && isRoomJoined && roomCode) {
-      console.log('Client requesting next round for room:', roomCode);
-      socket.emit('requestNextRound', { roomCode });
+      if (currentRound >= 5) {
+        setIsSessionComplete(true);
+      } else {
+        console.log('Client requesting next round for room:', roomCode);
+        socket.emit('requestNextRound', { roomCode });
+      }
     }
   };
   
@@ -203,9 +229,19 @@ const PointingPoker = () => {
       setTeams(currentTeams);
 
       const numTeams = Object.keys(currentTeams).length;
-      if (numTeams === 2) setCurrentGame('pong');
-      else if (numTeams > 2 && numTeams <= 5) setCurrentGame('racing');
-      else if (numTeams === 1 && Object.keys(allVotes).length > 0) {
+      if (numTeams === 2) {
+        setCurrentGame('pong');
+        if (socket && roomCode) {
+          console.log('[PointingPoker] Requesting server to start pong game for room:', roomCode, 'with teams:', currentTeams);
+          socket.emit('startPongGame', { roomCode, teams: currentTeams });
+        }
+      } else if (numTeams > 2 && numTeams <= 5) {
+        setCurrentGame('racing');
+        if (socket && roomCode) {
+          console.log('Requesting server to start racing game for room:', roomCode, 'with teams:', currentTeams);
+          socket.emit('startRacingGame', { roomCode, teams: currentTeams });
+        }
+      } else if (numTeams === 1 && Object.keys(currentTeams).length > 0) {
         const singleWinningNumber = Object.keys(currentTeams)[0];
         if (socket && roomCode) socket.emit('gameEnded', { roomCode, winningNumber: singleWinningNumber });
       } else {
@@ -285,6 +321,13 @@ const PointingPoker = () => {
                     </ListItem>
                     ))}
                 </List>
+                <BacklogItems 
+                  currentRound={currentRound} 
+                  allVotes={backlogVotes}
+                  players={players}
+                  revealed={revealed}
+                  isSessionComplete={isSessionComplete}
+                />
             </Grid>
 
             <Grid item xs={12} md={9}>
@@ -355,11 +398,22 @@ const PointingPoker = () => {
                     <Typography variant="body1" align="center" sx={{mt: 2}}>Calculating teams...</Typography>
                 )}
 
-                {currentGame === 'pong' && teams && <PongGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />}
-                 {currentGame === 'racing' && teams && <RacingGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />} 
-                {/*{currentGame === 'racing' && teams && <ZombieGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />}*/}
-
-
+                {currentGame === 'pong' && teams && <PongGame 
+                    teams={teams} 
+                    onGameEnd={handleGameEnd} 
+                    myName={userName} 
+                    winningNumber={winningNumber} 
+                    socket={socket}
+                    roomCode={roomCode}
+                />}
+                {currentGame === 'racing' && teams && <RacingGame 
+                    teams={teams} 
+                    onGameEnd={handleGameEnd} 
+                    myName={userName} 
+                    winningNumber={winningNumber}
+                    socket={socket}
+                    roomCode={roomCode}
+                />}
 
                 {winningNumber && !currentGame && (
                 <Box textAlign="center" sx={{ mt: 3 }}>
