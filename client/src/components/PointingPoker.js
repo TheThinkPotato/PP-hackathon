@@ -18,6 +18,9 @@ import PongGame from './games/PongGame';
 import RacingGame from './games/RacingGame';
 import ZombieGame from './games/ZombieGame';
 
+// Import a CSS file for styling the zombie image (optional, can do inline)
+// import './PointingPoker.css'; // Example: Create this file if you prefer separate CSS
+
 const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_SERVER_URL;
 const fibonacciNumbers = [0, 1, 2, 3, 5, 8, 13, 21, '☕', '?'];
 
@@ -39,6 +42,8 @@ const PointingPoker = () => {
   const [currentRound, setCurrentRound] = useState(1);
   const [backlogVotes, setBacklogVotes] = useState({});
   const [isSessionComplete, setIsSessionComplete] = useState(false);
+  const [showZombie, setShowZombie] = useState(false);
+  const [zombieOpacity, setZombieOpacity] = useState(1);
 
   const resetPokerStateForNewRound = useCallback(() => {
     setMyVote(null);
@@ -309,7 +314,24 @@ const PointingPoker = () => {
         }
       } else if (numTeams === 1 && Object.keys(currentTeams).length > 0) {
         const singleWinningNumber = Object.keys(currentTeams)[0];
-        if (socket && roomCode) socket.emit('gameEnded', { roomCode, winningNumber: singleWinningNumber });
+        // Check if all players voted for the same number
+        const allPlayersVoted = players.length > 0 && Object.keys(allVotes).length === players.length;
+        const votesArray = Object.values(allVotes);
+        const firstVote = votesArray[0];
+        const consensusReached = allPlayersVoted && votesArray.every(vote => vote === firstVote);
+
+        if (consensusReached) {
+          console.log('Consensus reached! Showing zombie.');
+          setShowZombie(true);
+          setZombieOpacity(1); // Reset opacity
+          // Game still ends, but we show zombie first
+          setTimeout(() => {
+            if (socket && roomCode) socket.emit('gameEnded', { roomCode, winningNumber: singleWinningNumber });
+          }, 2500); // Delay gameEnded to allow zombie to show
+        } else {
+          // If not consensus (e.g. only one person voted), end game immediately
+          if (socket && roomCode) socket.emit('gameEnded', { roomCode, winningNumber: singleWinningNumber });
+        }
       } else {
         // No specific game for this team count, or no consensus.
         // UI will show teams, players can proceed to next round when ready.
@@ -317,7 +339,28 @@ const PointingPoker = () => {
         // console.log('No specific game for team count:', numTeams, 'Teams:', currentTeams);
       }
     }
-  }, [isRoomJoined, revealed, allVotes, winningNumber, currentGame, socket, roomCode]);
+  }, [isRoomJoined, revealed, allVotes, winningNumber, currentGame, socket, roomCode, players]);
+
+  useEffect(() => {
+    let fadeTimeout;
+    let hideTimeout;
+    if (showZombie) {
+      // Start fade out after a short delay
+      fadeTimeout = setTimeout(() => {
+        setZombieOpacity(0);
+      }, 500); // Start fading after 0.5s
+
+      // Hide zombie and reset after fade animation (1.5s duration)
+      hideTimeout = setTimeout(() => {
+        setShowZombie(false);
+        // setZombieOpacity(1); // Opacity reset is handled when setShowZombie(true)
+      }, 2000); // 0.5s delay + 1.5s fade = 2s total
+    }
+    return () => {
+      clearTimeout(fadeTimeout);
+      clearTimeout(hideTimeout);
+    };
+  }, [showZombie]);
 
   const getTeamColor = (vote) => {
     const colors = ['#FFC107', '#2196F3', '#4CAF50', '#E91E63', '#9C27B0', '#00BCD4', '#FF9800'];
@@ -577,6 +620,35 @@ const PointingPoker = () => {
             </Grid>
         </Grid>
       </Paper>
+
+      {showZombie && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)', // Optional: semi-transparent background
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999, // Ensure it's on top
+            opacity: zombieOpacity,
+            transition: 'opacity 1.5s ease-out',
+          }}
+        >
+          <img 
+            src="/zombie1.png" // Assuming zombie1.png is in public folder
+            alt="Scary Zombie" 
+            style={{ 
+              maxWidth: '90%', 
+              maxHeight: '90%',
+              objectFit: 'contain',
+            }} 
+          />
+        </Box>
+      )}
     </Container>
   );
 };
