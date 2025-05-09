@@ -63,8 +63,8 @@ const PONG_CANVAS_HEIGHT = 400;
 const PONG_PADDLE_WIDTH = 10;
 const PONG_PADDLE_HEIGHT = 80;
 const PONG_BALL_RADIUS = 7;
-const PONG_INITIAL_BALL_SPEED_X = 2.5;
-const PONG_INITIAL_BALL_SPEED_Y = 2.5;
+const PONG_INITIAL_BALL_SPEED_X = 20.5;
+const PONG_INITIAL_BALL_SPEED_Y = 20.5;
 const PONG_PADDLE_SPEED = 5; // Simplified: units per tick or needs deltaTime
 const PONG_WINNING_SCORE = 5;
 const PONG_COUNTDOWN_SECONDS = 3;
@@ -372,177 +372,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('startRacingGame', ({ roomCode, teams }) => { // teams is { voteValue: [playerName1, playerName2,...] }
-    const room = rooms[roomCode];
-    if (!room || room.racingGameState.isActive) {
-        console.log(`Race already active or room ${roomCode} not found.`);
-        return;
-    }
-    console.log(`Starting racing game in room ${roomCode}`);
-    room.racingGameState.isActive = true;
-    room.racingGameState.cars = [];
-    room.racingGameState.pendingInputs = {};
-
-    let carIndex = 0;
-    for (const vote in teams) {
-        if (teams[vote] && teams[vote].length > 0) {
-            const driverName = teams[vote][0]; // First player of the team is the driver
-            const carId = vote; // Use vote as car ID for simplicity, ensure unique
-
-            room.racingGameState.cars.push({
-                id: carId,
-                name: driverName, // Driver's name
-                teamVote: vote,
-                x: serverTrackPathWaypoints[0].x + 50 + (carIndex * (CAR_WIDTH + 25)),
-                y: serverTrackPathWaypoints[0].y + (carIndex % 2 === 0 ? -TRACK_LANE_WIDTH / 4.5 : TRACK_LANE_WIDTH / 4.5),
-                angle: 0,
-                speed: 0,
-                lap: 0,
-                isPlayer: false, // Server doesn't differentiate 'isPlayer' in its state, client does
-                color: carColors[carIndex % carColors.length],
-                justCrossedFinishLine: true,
-                currentCheckpoint: 0,
-                // Server specific state for inputs
-                keysPressed: { ArrowUp: false, ArrowLeft: false, ArrowRight: false } 
-            });
-            room.racingGameState.pendingInputs[carId] = { ArrowUp: false, ArrowLeft: false, ArrowRight: false };
-            carIndex++;
-        }
-    }
-    
-    // Notify clients that game is starting (includes initial car setup)
-    io.to(roomCode).emit('racingGameStarted', { cars: room.racingGameState.cars, countdown: COUNTDOWN_SECONDS });
-
-    // Start server-side game loop
-    if (room.racingGameState.gameLoopIntervalId) {
-      clearInterval(room.racingGameState.gameLoopIntervalId);
-    }
-    room.racingGameState.gameLoopIntervalId = setInterval(() => {
-        if (!room.racingGameState.isActive) {
-            clearInterval(room.racingGameState.gameLoopIntervalId);
-            room.racingGameState.gameLoopIntervalId = null;
-            return;
-        }
-        
-        // --- Main Game Logic Tick (to be filled in next step) ---
-        // 1. Apply inputs from room.racingGameState.pendingInputs to car.keysPressed
-        // 2. Update physics for each car (speed, angle, position) based on car.keysPressed and deltaTime
-        // 3. Boundary checks / Off-track penalties
-        // 4. Lap counting
-        // 5. Winner check
-        // 6. Emit updated state
-        
-        // For now, just log and emit current state
-        // console.log(`Game tick for room ${roomCode}`); 
-        
-        const now = Date.now();
-        // Simulate deltaTime (simplified, ideally performance.now() or process.hrtime for more accuracy if available and needed)
-        const deltaTime = (now - (room.racingGameState.lastTickTime || now)) / 1000 || (1 / 30); // seconds
-        room.racingGameState.lastTickTime = now;
-
-        let winnerFoundInTick = false; // Flag to stop processing after a winner
-        for (const car of room.racingGameState.cars) {
-            if (winnerFoundInTick) break; // If winner found in this tick by a previous car, stop processing others
-
-            // Apply pending inputs (simplified: just copy over, could be more complex like queues)
-            if(room.racingGameState.pendingInputs[car.id]) {
-                car.keysPressed = { ...room.racingGameState.pendingInputs[car.id] }; 
-                // Reset pending inputs for this car for this tick if they are processed once per tick
-                // Or, if they represent continuous press, client needs to send keyUp too.
-                // For now, assume client sends true/false state for keys.
-            }
-
-            let { x, y, angle, speed, lap, currentCheckpoint } = car;
-            const carInputs = car.keysPressed;
-
-            // --- Basic Physics (copied and adapted from client, will need refinement) ---
-            if (carInputs['ArrowUp']) {
-                speed = Math.min(MAX_SPEED, speed + ACCEL * deltaTime);
-            } else {
-                speed = Math.max(0, speed - DECEL_FRICTION * deltaTime);
-            }
-            if (speed > 0.1) {
-                if (carInputs['ArrowLeft']) {
-                    angle -= TURN_RATE * (speed / MAX_SPEED) * deltaTime;
-                }
-                if (carInputs['ArrowRight']) {
-                    angle += TURN_RATE * (speed / MAX_SPEED) * deltaTime;
-                }
-            }
-            
-            const prevX = x; const prevY = y;
-            // The arbitrary '60' scalar was from client; if speed is units/sec, 60*dt is units per 60*dt seconds.
-            // If ACCEL is units/sec^2, speed is units/sec. Then new_pos = old_pos + speed * dt.
-            // Let's remove the arbitrary 60 for now and adjust MAX_SPEED/ACCEL if movement is too slow/fast.
-            x += Math.cos(angle) * speed * deltaTime * 50; // Multiplied by 50 as a placeholder scaling factor, adjust as needed
-            y += Math.sin(angle) * speed * deltaTime * 50; // Multiplied by 50 as a placeholder scaling factor, adjust as needed
-
-            // Server-side track boundary (very basic, placeholder)
-            if (!isPointOnTrackSurfaceServer(x,y)) {
-                x = prevX; y = prevY; speed *= 0.5; // Penalty
-            }
-
-            // Server-side lap counting (simplified, needs proper checkpoints)
-            const atFinishLineZoneServer = (x > FINISH_LINE_X_START && x < FINISH_LINE_X_END && y > FINISH_LINE_Y_CENTER - TRACK_LANE_WIDTH/2 && y < FINISH_LINE_Y_CENTER + TRACK_LANE_WIDTH/2);
-            // This needs the same multi-checkpoint logic as the client.
-            // For now, very simple lap increment.
-            if (currentCheckpoint === 0 && x > serverTrackPathWaypoints[1].x - R_center && y > serverTrackPathWaypoints[1].y - R_center*2) currentCheckpoint = 1;
-            // ... (add other checkpoints similar to client) ...
-            else if (currentCheckpoint === 1 /* && other conditions */ && atFinishLineZoneServer /* && correct direction */ ) {
-                 if (!car.justCrossedFinishLine) {
-                    lap++;
-                    car.justCrossedFinishLine = true;
-                    currentCheckpoint = 0; // Reset for next lap
-                    console.log(`Car ${car.name} completed lap ${lap} in room ${roomCode}`);
-                 }
-            }
-            if (car.justCrossedFinishLine && currentCheckpoint !== 0 /* and not near finish again */) {
-                 car.justCrossedFinishLine = false;
-            }
-
-
-            // Update car object
-            car.x = x; car.y = y; car.angle = angle; car.speed = speed; car.lap = lap; car.currentCheckpoint = currentCheckpoint;
-
-            // Check for winner
-            if (car.lap >= WINNING_LAPS && room.racingGameState.isActive) { // Check isActive again in case of simultaneous finish
-                console.log(`Car ${car.name} wins in room ${roomCode}!`);
-                room.winningNumber = car.teamVote; // The original poker vote of the winning team
-                room.racingGameState.isActive = false; // Stop the game
-                
-                const teamsForResults = calculateTeams(room.votesByName); // Get current teams based on votes
-                io.to(roomCode).emit('roundResults', { teams: teamsForResults, winningNumber: room.winningNumber });
-                
-                winnerFoundInTick = true; // Set flag
-                // The loop will break at the start of the next iteration or naturally end
-                // The main interval clear logic will handle stopping the game loop
-            }
-        }
-        if (winnerFoundInTick || !room.racingGameState.isActive) { // Check flag or if isActive was set false elsewhere
-             clearInterval(room.racingGameState.gameLoopIntervalId);
-             room.racingGameState.gameLoopIntervalId = null;
-             // Reset parts of racingGameState for next potential race, or do this in requestNextRound
-             room.racingGameState.cars = [];
-             room.racingGameState.pendingInputs = {};
-             return;
-        }
-
-        io.to(roomCode).emit('racingGameStateUpdate', { cars: room.racingGameState.cars });
-
-    }, SERVER_TICK_RATE); // Server tick rate
-
-  });
-
-  socket.on('playerRacingInput', ({ roomCode, carId, inputKey, pressed }) => {
-    const room = rooms[roomCode];
-    if (room && room.racingGameState.isActive && room.racingGameState.pendingInputs[carId]) {
-        // Store the latest state of the key press.
-        // The game loop will consume this.
-        room.racingGameState.pendingInputs[carId][inputKey] = pressed;
-        // console.log(`Input from ${socket.id} for car ${carId} in room ${roomCode}: ${inputKey} = ${pressed}`);
-    }
-  });
-
   socket.on('gameEnded', ({ roomCode, winningNumber }) => {
     const room = rooms[roomCode];
     // This event might now be deprecated if server solely determines game end for racing/pong.
@@ -585,7 +414,10 @@ io.on('connection', (socket) => {
       }
       room.pongGameState = {
         isActive: false, ball: { x: PONG_CANVAS_WIDTH / 2, y: PONG_CANVAS_HEIGHT / 2, dx: 0, dy: 0 },
-        paddles: {}, players: { teamA: null, teamB: null }, gameLoopIntervalId: null, countdown: 0
+        paddles: {},
+        players: { teamA: null, teamB: null },
+        gameLoopIntervalId: null,
+        countdown: 0
       };
       // Reset poker state
       room.votesByName = {};
@@ -611,9 +443,16 @@ io.on('connection', (socket) => {
         return;
     }
     console.log(`Starting Pong game in room ${roomCode}`);
-    room.pongGameState.isActive = true;
-    room.pongGameState.ball = { x: PONG_CANVAS_WIDTH / 2, y: PONG_CANVAS_HEIGHT / 2, dx: 0, dy: 0 };
-    room.pongGameState.countdown = PONG_COUNTDOWN_SECONDS;
+    
+    // Reset game state completely
+    room.pongGameState = {
+        isActive: true,
+        ball: { x: PONG_CANVAS_WIDTH / 2, y: PONG_CANVAS_HEIGHT / 2, dx: 0, dy: 0 },
+        paddles: {},
+        players: { teamA: null, teamB: null },
+        gameLoopIntervalId: null,
+        countdown: PONG_COUNTDOWN_SECONDS
+    };
 
     const teamKeys = Object.keys(teams);
     const teamAData = { vote: teamKeys[0], players: teams[teamKeys[0]] };
@@ -622,45 +461,57 @@ io.on('connection', (socket) => {
     const p1DriverName = teamAData.players[0];
     const p2DriverName = teamBData.players[0];
     
-    // Find playerIds (socketIds) for the drivers if possible, or rely on names
-    // This part might need adjustment based on how you want to map players to paddles (name vs socketId)
+    // Find playerIds (socketIds) for the drivers
     let p1SocketId = null, p2SocketId = null;
     for(const socketId in room.users){
         if(room.users[socketId].name === p1DriverName) p1SocketId = socketId;
         if(room.users[socketId].name === p2DriverName) p2SocketId = socketId;
     }
 
+    console.log(`Setting up paddles - Team A: ${p1DriverName} (${p1SocketId}), Team B: ${p2DriverName} (${p2SocketId})`);
+
+    // Initialize paddles with proper structure
     room.pongGameState.paddles = {
         teamA: {
-            y: PONG_CANVAS_HEIGHT / 2 - PONG_PADDLE_HEIGHT / 2, score: 0,
-            playerId: p1SocketId || p1DriverName, // Store identifier
+            y: PONG_CANVAS_HEIGHT / 2 - PONG_PADDLE_HEIGHT / 2,
+            score: 0,
+            playerId: p1SocketId,
             name: p1DriverName,
             vote: teamAData.vote,
-            keysPressed: { up: false, down: false }
+            keysPressed: { up: false, down: false },
+            color: '#FF5733',
+            speedMultiplier: 1.0
         },
         teamB: {
-            y: PONG_CANVAS_HEIGHT / 2 - PONG_PADDLE_HEIGHT / 2, score: 0,
-            playerId: p2SocketId || p2DriverName, // Store identifier
+            y: PONG_CANVAS_HEIGHT / 2 - PONG_PADDLE_HEIGHT / 2,
+            score: 0,
+            playerId: p2SocketId,
             name: p2DriverName,
             vote: teamBData.vote,
-            keysPressed: { up: false, down: false }
+            keysPressed: { up: false, down: false },
+            color: '#3357FF',
+            speedMultiplier: 1.0
         }
     };
-    // Store who is playing for easier reference if needed
-    room.pongGameState.players = { teamA: { name: p1DriverName, vote: teamAData.vote }, teamB: {name: p2DriverName, vote: teamBData.vote}};
+
+    // Store who is playing for easier reference
+    room.pongGameState.players = {
+        teamA: { name: p1DriverName, vote: teamAData.vote },
+        teamB: { name: p2DriverName, vote: teamBData.vote }
+    };
 
     const getClientSafePongState = (currentPongState) => {
         if (!currentPongState) return null;
         return {
             isActive: currentPongState.isActive,
             ball: currentPongState.ball,
-            paddles: currentPongState.paddles, // Assuming paddles and its nested keysPressed are plain data
-            players: currentPongState.players, // Assuming this is plain data
-            countdown: currentPongState.countdown,
-            // Explicitly exclude gameLoopIntervalId and any other server-internal properties
+            paddles: currentPongState.paddles,
+            players: currentPongState.players,
+            countdown: currentPongState.countdown
         };
     };
 
+    // Notify all clients that game is starting
     io.to(roomCode).emit('pongGameStarted', { pongGameState: getClientSafePongState(room.pongGameState) });
 
     if (room.pongGameState.gameLoopIntervalId) clearInterval(room.pongGameState.gameLoopIntervalId);
@@ -673,14 +524,13 @@ io.on('connection', (socket) => {
             clearInterval(countdownInterval);
             room.pongGameState.ball.dx = Math.random() > 0.5 ? PONG_INITIAL_BALL_SPEED_X : -PONG_INITIAL_BALL_SPEED_X;
             room.pongGameState.ball.dy = Math.random() > 0.5 ? PONG_INITIAL_BALL_SPEED_Y : -PONG_INITIAL_BALL_SPEED_Y;
-            io.to(roomCode).emit('pongGameUpdate', { pongGameState: getClientSafePongState(room.pongGameState) }); // Send initial ball speed
+            io.to(roomCode).emit('pongGameUpdate', { pongGameState: getClientSafePongState(room.pongGameState) });
         }
     }, 1000);
 
     room.pongGameState.gameLoopIntervalId = setInterval(() => {
         if (!room.pongGameState.isActive || countdownRemaining > 0) {
-             // Do not run game logic if not active or countdown is still running
-            if (!room.pongGameState.isActive) { // If game became inactive, clear interval
+            if (!room.pongGameState.isActive) {
                 clearInterval(room.pongGameState.gameLoopIntervalId);
                 room.pongGameState.gameLoopIntervalId = null;
             }
@@ -691,11 +541,52 @@ io.on('connection', (socket) => {
         const paddleA = paddles.teamA;
         const paddleB = paddles.teamB;
 
-        // Paddle movement - Simplified: move by fixed amount per tick if key pressed
-        if (paddleA.keysPressed.up) paddleA.y = Math.max(0, paddleA.y - PONG_PADDLE_SPEED);
-        if (paddleA.keysPressed.down) paddleA.y = Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, paddleA.y + PONG_PADDLE_SPEED);
-        if (paddleB.keysPressed.up) paddleB.y = Math.max(0, paddleB.y - PONG_PADDLE_SPEED);
-        if (paddleB.keysPressed.down) paddleB.y = Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, paddleB.y + PONG_PADDLE_SPEED);
+        // Random movement for paddles
+        const randomMoveA = Math.random() > 0.5 ? 1 : -1;
+        const randomMoveB = Math.random() > 0.5 ? 1 : -1;
+        
+        // Initialize or update speed multipliers if they don't exist
+        if (!paddleA.speedMultiplier) paddleA.speedMultiplier = 1.0;
+        if (!paddleB.speedMultiplier) paddleB.speedMultiplier = 1.0;
+        
+        // Update speed multipliers exponentially based on W/S keys
+        if (paddleA.keysPressed.up) {
+            paddleA.speedMultiplier = Math.min(8.0, paddleA.speedMultiplier * 1.1);
+        } else if (paddleA.keysPressed.down) {
+            paddleA.speedMultiplier = Math.max(0.125, paddleA.speedMultiplier * 0.9);
+        } else {
+            paddleA.speedMultiplier = 1.0 + (paddleA.speedMultiplier - 1.0) * 0.9;
+        }
+
+        if (paddleB.keysPressed.up) {
+            paddleB.speedMultiplier = Math.min(8.0, paddleB.speedMultiplier * 1.1);
+        } else if (paddleB.keysPressed.down) {
+            paddleB.speedMultiplier = Math.max(0.125, paddleB.speedMultiplier * 0.9);
+        } else {
+            paddleB.speedMultiplier = 1.0 + (paddleB.speedMultiplier - 1.0) * 0.9;
+        }
+        
+        // Move paddle A randomly with exponential speed control
+        paddleA.y = Math.max(0, Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, 
+            paddleA.y + (randomMoveA * PONG_PADDLE_SPEED * 0.5 * paddleA.speedMultiplier)));
+        
+        // Move paddle B randomly with exponential speed control
+        paddleB.y = Math.max(0, Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, 
+            paddleB.y + (randomMoveB * PONG_PADDLE_SPEED * 0.5 * paddleB.speedMultiplier)));
+
+        // Handle button presses for fixed pixel movement
+        if (paddleA.keysPressed.up) {
+            paddleA.y = Math.max(0, paddleA.y - 10);
+        }
+        if (paddleA.keysPressed.down) {
+            paddleA.y = Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, paddleA.y + 10);
+        }
+        if (paddleB.keysPressed.up) {
+            paddleB.y = Math.max(0, paddleB.y - 10);
+        }
+        if (paddleB.keysPressed.down) {
+            paddleB.y = Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, paddleB.y + 10);
+        }
 
         // Ball movement
         ball.x += ball.dx;
@@ -710,8 +601,8 @@ io.on('connection', (socket) => {
         // Paddle A (left)
         if (ball.dx < 0 && ball.x - PONG_BALL_RADIUS < PONG_PADDLE_WIDTH && ball.x - PONG_BALL_RADIUS > 0 &&
             ball.y > paddleA.y && ball.y < paddleA.y + PONG_PADDLE_HEIGHT) {
-            ball.dx = -ball.dx * 1.05; // Increase speed slightly
-            ball.x = PONG_PADDLE_WIDTH + PONG_BALL_RADIUS; // Ensure ball is outside paddle
+            ball.dx = -ball.dx * 1.05;
+            ball.x = PONG_PADDLE_WIDTH + PONG_BALL_RADIUS;
         }
         // Paddle B (right)
         else if (ball.dx > 0 && ball.x + PONG_BALL_RADIUS > PONG_CANVAS_WIDTH - PONG_PADDLE_WIDTH && ball.x + PONG_BALL_RADIUS < PONG_CANVAS_WIDTH &&
@@ -722,10 +613,10 @@ io.on('connection', (socket) => {
 
         // Scoring
         let scored = false;
-        if (ball.x - PONG_BALL_RADIUS < 0) { // Player B (paddleA is left) scores
+        if (ball.x - PONG_BALL_RADIUS < 0) {
             paddleB.score++;
             scored = true;
-        } else if (ball.x + PONG_BALL_RADIUS > PONG_CANVAS_WIDTH) { // Player A (paddleB is right) scores
+        } else if (ball.x + PONG_BALL_RADIUS > PONG_CANVAS_WIDTH) {
             paddleA.score++;
             scored = true;
         }
@@ -733,7 +624,7 @@ io.on('connection', (socket) => {
         if (scored) {
             ball.x = PONG_CANVAS_WIDTH / 2;
             ball.y = PONG_CANVAS_HEIGHT / 2;
-            ball.dx = (paddleA.score > paddleB.score ? -1 : 1) * PONG_INITIAL_BALL_SPEED_X; // Serve to losing side or random
+            ball.dx = (paddleA.score > paddleB.score ? -1 : 1) * PONG_INITIAL_BALL_SPEED_X;
             ball.dy = Math.random() > 0.5 ? PONG_INITIAL_BALL_SPEED_Y : -PONG_INITIAL_BALL_SPEED_Y;
         }
 
@@ -744,8 +635,7 @@ io.on('connection', (socket) => {
 
         if (winnerVote) {
             room.winningNumber = winnerVote;
-            room.pongGameState.isActive = false; // Stop the game
-            // clearInterval handled at top of next interval or when isActive becomes false
+            room.pongGameState.isActive = false;
             const teamsForResults = calculateTeams(room.votesByName);
             io.to(roomCode).emit('roundResults', { teams: teamsForResults, winningNumber: room.winningNumber });
         }
@@ -755,204 +645,32 @@ io.on('connection', (socket) => {
     }, SERVER_TICK_RATE);
   });
 
-  socket.on('playerPongInput', ({ roomCode, paddleKey, // e.g. 'teamA' or 'teamB'
-                                   inputAction, // e.g. 'up' or 'down'
-                                   pressed }) => {
+  socket.on('playerPongInput', ({ roomCode, paddleKey, inputAction, pressed }) => {
     const room = rooms[roomCode];
-    if (room && room.pongGameState.isActive && room.pongGameState.paddles[paddleKey]) {
-        // Ensure the socket sending this is the one controlling the paddle
-        const currentSocketId = socket.id;
-        const actualPlayerId = room.pongGameState.paddles[paddleKey].playerId;
-        
-        // If playerId is socketId, compare directly. If it's a name, find corresponding socketId.
-        let isAuthorized = false;
-        if (actualPlayerId === currentSocketId) {
-            isAuthorized = true;
-        } else if (room.users[currentSocketId] && room.users[currentSocketId].name === actualPlayerId) {
-             isAuthorized = true; // If stored playerId was a name and matches sender's name
-        }
-
-        if(isAuthorized){
-            room.pongGameState.paddles[paddleKey].keysPressed[inputAction] = pressed;
-        } else {
-            console.log(`Unauthorized pong input from ${socket.id} for paddle ${paddleKey}`);
-        }
-    }
-  });
-
-  socket.on('startPongGame', ({ roomCode, teams }) => {
-    const room = rooms[roomCode];
-    if (!room || room.pongGameState.isActive || Object.keys(teams).length !== 2) {
-        console.log(`Pong game already active, room ${roomCode} not found, or incorrect team count.`);
+    if (!room || !room.pongGameState.isActive || !room.pongGameState.paddles[paddleKey]) {
+        console.log(`[Server] Ignoring paddle input: room=${roomCode}, active=${room?.pongGameState?.isActive}, paddleExists=${room?.pongGameState?.paddles?.[paddleKey]}`);
         return;
     }
-    console.log(`Starting Pong game in room ${roomCode}`);
-    room.pongGameState.isActive = true;
-    room.pongGameState.ball = { x: PONG_CANVAS_WIDTH / 2, y: PONG_CANVAS_HEIGHT / 2, dx: 0, dy: 0 };
-    room.pongGameState.countdown = PONG_COUNTDOWN_SECONDS;
 
-    const teamKeys = Object.keys(teams);
-    const teamAData = { vote: teamKeys[0], players: teams[teamKeys[0]] };
-    const teamBData = { vote: teamKeys[1], players: teams[teamKeys[1]] };
-
-    const p1DriverName = teamAData.players[0];
-    const p2DriverName = teamBData.players[0];
+    // Ensure the socket sending this is the one controlling the paddle
+    const currentSocketId = socket.id;
+    const paddle = room.pongGameState.paddles[paddleKey];
+    const actualPlayerId = paddle.playerId;
     
-    // Find playerIds (socketIds) for the drivers if possible, or rely on names
-    // This part might need adjustment based on how you want to map players to paddles (name vs socketId)
-    let p1SocketId = null, p2SocketId = null;
-    for(const socketId in room.users){
-        if(room.users[socketId].name === p1DriverName) p1SocketId = socketId;
-        if(room.users[socketId].name === p2DriverName) p2SocketId = socketId;
+    // If playerId is socketId, compare directly. If it's a name, find corresponding socketId.
+    let isAuthorized = false;
+    if (actualPlayerId === currentSocketId) {
+        isAuthorized = true;
+    } else if (room.users[currentSocketId] && room.users[currentSocketId].name === actualPlayerId) {
+        isAuthorized = true;
     }
 
-    room.pongGameState.paddles = {
-        teamA: {
-            y: PONG_CANVAS_HEIGHT / 2 - PONG_PADDLE_HEIGHT / 2, score: 0,
-            playerId: p1SocketId || p1DriverName, // Store identifier
-            name: p1DriverName,
-            vote: teamAData.vote,
-            keysPressed: { up: false, down: false }
-        },
-        teamB: {
-            y: PONG_CANVAS_HEIGHT / 2 - PONG_PADDLE_HEIGHT / 2, score: 0,
-            playerId: p2SocketId || p2DriverName, // Store identifier
-            name: p2DriverName,
-            vote: teamBData.vote,
-            keysPressed: { up: false, down: false }
-        }
-    };
-    // Store who is playing for easier reference if needed
-    room.pongGameState.players = { teamA: { name: p1DriverName, vote: teamAData.vote }, teamB: {name: p2DriverName, vote: teamBData.vote}};
-
-    const getClientSafePongState = (currentPongState) => {
-        if (!currentPongState) return null;
-        return {
-            isActive: currentPongState.isActive,
-            ball: currentPongState.ball,
-            paddles: currentPongState.paddles, // Assuming paddles and its nested keysPressed are plain data
-            players: currentPongState.players, // Assuming this is plain data
-            countdown: currentPongState.countdown,
-            // Explicitly exclude gameLoopIntervalId and any other server-internal properties
-        };
-    };
-
-    io.to(roomCode).emit('pongGameStarted', { pongGameState: getClientSafePongState(room.pongGameState) });
-
-    if (room.pongGameState.gameLoopIntervalId) clearInterval(room.pongGameState.gameLoopIntervalId);
-
-    let countdownRemaining = PONG_COUNTDOWN_SECONDS;
-    const countdownInterval = setInterval(() => {
-        countdownRemaining--;
-        io.to(roomCode).emit('pongCountdownUpdate', { countdown: countdownRemaining });
-        if (countdownRemaining <= 0) {
-            clearInterval(countdownInterval);
-            room.pongGameState.ball.dx = Math.random() > 0.5 ? PONG_INITIAL_BALL_SPEED_X : -PONG_INITIAL_BALL_SPEED_X;
-            room.pongGameState.ball.dy = Math.random() > 0.5 ? PONG_INITIAL_BALL_SPEED_Y : -PONG_INITIAL_BALL_SPEED_Y;
-            io.to(roomCode).emit('pongGameUpdate', { pongGameState: getClientSafePongState(room.pongGameState) }); // Send initial ball speed
-        }
-    }, 1000);
-
-    room.pongGameState.gameLoopIntervalId = setInterval(() => {
-        if (!room.pongGameState.isActive || countdownRemaining > 0) {
-             // Do not run game logic if not active or countdown is still running
-            if (!room.pongGameState.isActive) { // If game became inactive, clear interval
-                clearInterval(room.pongGameState.gameLoopIntervalId);
-                room.pongGameState.gameLoopIntervalId = null;
-            }
-            return;
-        }
-
-        const { ball, paddles } = room.pongGameState;
-        const paddleA = paddles.teamA;
-        const paddleB = paddles.teamB;
-
-        // Paddle movement - Simplified: move by fixed amount per tick if key pressed
-        if (paddleA.keysPressed.up) paddleA.y = Math.max(0, paddleA.y - PONG_PADDLE_SPEED);
-        if (paddleA.keysPressed.down) paddleA.y = Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, paddleA.y + PONG_PADDLE_SPEED);
-        if (paddleB.keysPressed.up) paddleB.y = Math.max(0, paddleB.y - PONG_PADDLE_SPEED);
-        if (paddleB.keysPressed.down) paddleB.y = Math.min(PONG_CANVAS_HEIGHT - PONG_PADDLE_HEIGHT, paddleB.y + PONG_PADDLE_SPEED);
-
-        // Ball movement
-        ball.x += ball.dx;
-        ball.y += ball.dy;
-
-        // Ball collision with top/bottom walls
-        if (ball.y + PONG_BALL_RADIUS > PONG_CANVAS_HEIGHT || ball.y - PONG_BALL_RADIUS < 0) {
-            ball.dy = -ball.dy;
-        }
-
-        // Ball collision with paddles
-        // Paddle A (left)
-        if (ball.dx < 0 && ball.x - PONG_BALL_RADIUS < PONG_PADDLE_WIDTH && ball.x - PONG_BALL_RADIUS > 0 &&
-            ball.y > paddleA.y && ball.y < paddleA.y + PONG_PADDLE_HEIGHT) {
-            ball.dx = -ball.dx * 1.05; // Increase speed slightly
-            ball.x = PONG_PADDLE_WIDTH + PONG_BALL_RADIUS; // Ensure ball is outside paddle
-        }
-        // Paddle B (right)
-        else if (ball.dx > 0 && ball.x + PONG_BALL_RADIUS > PONG_CANVAS_WIDTH - PONG_PADDLE_WIDTH && ball.x + PONG_BALL_RADIUS < PONG_CANVAS_WIDTH &&
-            ball.y > paddleB.y && ball.y < paddleB.y + PONG_PADDLE_HEIGHT) {
-            ball.dx = -ball.dx * 1.05;
-            ball.x = PONG_CANVAS_WIDTH - PONG_PADDLE_WIDTH - PONG_BALL_RADIUS;
-        }
-
-        // Scoring
-        let scored = false;
-        if (ball.x - PONG_BALL_RADIUS < 0) { // Player B (paddleA is left) scores
-            paddleB.score++;
-            scored = true;
-        } else if (ball.x + PONG_BALL_RADIUS > PONG_CANVAS_WIDTH) { // Player A (paddleB is right) scores
-            paddleA.score++;
-            scored = true;
-        }
-
-        if (scored) {
-            ball.x = PONG_CANVAS_WIDTH / 2;
-            ball.y = PONG_CANVAS_HEIGHT / 2;
-            ball.dx = (paddleA.score > paddleB.score ? -1 : 1) * PONG_INITIAL_BALL_SPEED_X; // Serve to losing side or random
-            ball.dy = Math.random() > 0.5 ? PONG_INITIAL_BALL_SPEED_Y : -PONG_INITIAL_BALL_SPEED_Y;
-        }
-
-        // Check for winner
-        let winnerVote = null;
-        if (paddleA.score >= PONG_WINNING_SCORE) winnerVote = paddleA.vote;
-        if (paddleB.score >= PONG_WINNING_SCORE) winnerVote = paddleB.vote;
-
-        if (winnerVote) {
-            room.winningNumber = winnerVote;
-            room.pongGameState.isActive = false; // Stop the game
-            // clearInterval handled at top of next interval or when isActive becomes false
-            const teamsForResults = calculateTeams(room.votesByName);
-            io.to(roomCode).emit('roundResults', { teams: teamsForResults, winningNumber: room.winningNumber });
-        }
-        
-        io.to(roomCode).emit('pongGameUpdate', { pongGameState: getClientSafePongState(room.pongGameState) });
-
-    }, SERVER_TICK_RATE);
-  });
-
-  socket.on('playerPongInput', ({ roomCode, paddleKey, // e.g. 'teamA' or 'teamB'
-                                   inputAction, // e.g. 'up' or 'down'
-                                   pressed }) => {
-    const room = rooms[roomCode];
-    if (room && room.pongGameState.isActive && room.pongGameState.paddles[paddleKey]) {
-        // Ensure the socket sending this is the one controlling the paddle
-        const currentSocketId = socket.id;
-        const actualPlayerId = room.pongGameState.paddles[paddleKey].playerId;
-        
-        // If playerId is socketId, compare directly. If it's a name, find corresponding socketId.
-        let isAuthorized = false;
-        if (actualPlayerId === currentSocketId) {
-            isAuthorized = true;
-        } else if (room.users[currentSocketId] && room.users[currentSocketId].name === actualPlayerId) {
-             isAuthorized = true; // If stored playerId was a name and matches sender's name
-        }
-
-        if(isAuthorized){
-            room.pongGameState.paddles[paddleKey].keysPressed[inputAction] = pressed;
-        } else {
-            console.log(`Unauthorized pong input from ${socket.id} for paddle ${paddleKey}`);
-        }
+    if(isAuthorized){
+        console.log(`[Server] Processing paddle input: room=${roomCode}, paddle=${paddleKey}, action=${inputAction}, pressed=${pressed}`);
+        paddle.keysPressed[inputAction] = pressed;
+        console.log(`[Server] Updated paddle state:`, paddle.keysPressed);
+    } else {
+        console.log(`[Server] Unauthorized pong input from ${socket.id} for paddle ${paddleKey}`);
     }
   });
 
