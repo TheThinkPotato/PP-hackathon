@@ -44,6 +44,7 @@ const PointingPoker = () => {
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   const [showZombie, setShowZombie] = useState(false);
   const [zombieOpacity, setZombieOpacity] = useState(1);
+  const [zombieImg, setZombieImg] = useState('/zombie1.png'); // Default, will be set randomly
 
   const resetPokerStateForNewRound = useCallback(() => {
     setMyVote(null);
@@ -314,22 +315,20 @@ const PointingPoker = () => {
         }
       } else if (numTeams === 1 && Object.keys(currentTeams).length > 0) {
         const singleWinningNumber = Object.keys(currentTeams)[0];
-        // Check if all players voted for the same number
         const allPlayersVoted = players.length > 0 && Object.keys(allVotes).length === players.length;
         const votesArray = Object.values(allVotes);
         const firstVote = votesArray[0];
         const consensusReached = allPlayersVoted && votesArray.every(vote => vote === firstVote);
-
         if (consensusReached) {
-          console.log('Consensus reached! Showing zombie.');
+          // Randomly select one of the two zombies
+          const zombieImages = ['/zombie1.png', '/zombie2.png'];
+          setZombieImg(zombieImages[Math.floor(Math.random() * zombieImages.length)]);
           setShowZombie(true);
           setZombieOpacity(1); // Reset opacity
-          // Game still ends, but we show zombie first
           setTimeout(() => {
             if (socket && roomCode) socket.emit('gameEnded', { roomCode, winningNumber: singleWinningNumber });
           }, 2500); // Delay gameEnded to allow zombie to show
         } else {
-          // If not consensus (e.g. only one person voted), end game immediately
           if (socket && roomCode) socket.emit('gameEnded', { roomCode, winningNumber: singleWinningNumber });
         }
       } else {
@@ -353,7 +352,7 @@ const PointingPoker = () => {
       // Hide zombie and reset after fade animation (1.5s duration)
       hideTimeout = setTimeout(() => {
         setShowZombie(false);
-        // setZombieOpacity(1); // Opacity reset is handled when setShowZombie(true)
+        setZombieOpacity(1); // Reset for next time
       }, 2000); // 0.5s delay + 1.5s fade = 2s total
     }
     return () => {
@@ -629,17 +628,17 @@ const PointingPoker = () => {
             left: 0,
             width: '100vw',
             height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.7)', // Optional: semi-transparent background
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            zIndex: 9999, // Ensure it's on top
+            zIndex: 9999,
             opacity: zombieOpacity,
             transition: 'opacity 1.5s ease-out',
           }}
         >
           <img 
-            src="/zombie1.png" // Assuming zombie1.png is in public folder
+            src={zombieImg} // Randomly selected zombie image
             alt="Scary Zombie" 
             style={{ 
               maxWidth: '90%', 
