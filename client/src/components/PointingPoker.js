@@ -18,7 +18,7 @@ import PongGame from './games/PongGame';
 import RacingGame from './games/RacingGame';
 import ZombieGame from './games/ZombieGame';
 
-const SOCKET_SERVER_URL = 'https://72df-49-255-11-50.ngrok-free.app';
+const SOCKET_SERVER_URL = process.env.REACT_APP_SOCKET_SERVER_URL;
 const fibonacciNumbers = [0, 1, 2, 3, 5, 8, 13, 21, '☕', '?'];
 
 const PointingPoker = () => {
