@@ -290,11 +290,17 @@ const PointingPoker = () => {
           console.log('[PointingPoker] Requesting server to start pong game for room:', roomCode, 'with teams:', currentTeams);
           socket.emit('startPongGame', { roomCode, teams: currentTeams });
         }
-      } else if (numTeams > 2 && numTeams <= 5) {
+      } else if (numTeams === 3) {
         setCurrentGame('racing');
         if (socket && roomCode) {
           console.log('Requesting server to start racing game for room:', roomCode, 'with teams:', currentTeams);
           socket.emit('startRacingGame', { roomCode, teams: currentTeams });
+        }
+      } else if (numTeams >= 4 && numTeams <= 8) {
+        setCurrentGame('zombie');
+        if (socket && roomCode) {
+          console.log('[PointingPoker] Requesting server to start zombie game for room:', roomCode, 'with teams:', currentTeams);
+          socket.emit('startZombieGame', { roomCode, teams: currentTeams });
         }
       } else if (numTeams === 1 && Object.keys(currentTeams).length > 0) {
         const singleWinningNumber = Object.keys(currentTeams)[0];
@@ -462,6 +468,14 @@ const PointingPoker = () => {
                     roomCode={roomCode}
                 />}
                 {currentGame === 'racing' && teams && <RacingGame 
+                    teams={teams} 
+                    onGameEnd={handleGameEnd} 
+                    myName={userName} 
+                    winningNumber={winningNumber}
+                    socket={socket}
+                    roomCode={roomCode}
+                />}
+                {currentGame === 'zombie' && teams && <ZombieGame 
                     teams={teams} 
                     onGameEnd={handleGameEnd} 
                     myName={userName} 
