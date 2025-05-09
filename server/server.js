@@ -14,7 +14,17 @@ const io = socketIo(server, {
 });
 
 // Store states for multiple rooms
-// rooms = { roomCode: { users: { socketId: { name, vote } }, votesByName: { userName: vote }, revealed, winningNumber, currentRound, adminSocketId } }
+// rooms = { 
+//   roomCode: { 
+//     users: { socketId: { name, vote } }, 
+//     votesByName: { userName: vote }, 
+//     itemVotes: { item_1: { votes: { userName: vote }, winningNumber: number } },
+//     revealed, 
+//     winningNumber, 
+//     currentRound, 
+//     adminSocketId 
+//   } 
+// }
 const rooms = {};
 
 function generateRoomCode() {
@@ -39,12 +49,13 @@ io.on('connection', (socket) => {
   socket.on('createRoom', ({ userName }) => {
     const roomCode = generateRoomCode();
     rooms[roomCode] = {
-      users: {}, // { socketId: { name, vote } }
-      votesByName: {}, // { userName: voteValue }
+      users: {},
+      votesByName: {},
+      itemVotes: {},
       revealed: false,
       winningNumber: null,
       currentRound: 1,
-      adminSocketId: socket.id // First user is admin, can be expanded later
+      adminSocketId: socket.id
     };
     rooms[roomCode].users[socket.id] = { name: userName };
     socket.join(roomCode);
@@ -65,20 +76,19 @@ io.on('connection', (socket) => {
       console.log(`User ${userName} (${socket.id}) joined room ${roomCode}`);
       socket.emit('roomJoined', { roomCode, roomState: room, userName });
       io.to(roomCode).emit('playerListUpdate', Object.values(room.users).map(u => u.name));
-      // Send current vote status if already started/revealed
       socket.emit('allVotesUpdate', { votes: room.votesByName, revealed: room.revealed });
       if (room.winningNumber) {
-          socket.emit('roundResults', { teams: calculateTeams(room.votesByName), winningNumber: room.winningNumber });
+        socket.emit('roundResults', { teams: calculateTeams(room.votesByName), winningNumber: room.winningNumber });
       }
     } else {
       socket.emit('joinError', { message: 'Room not found.' });
     }
   });
 
-  socket.on('vote', ({ roomCode, userName, vote }) => {
+  socket.on('vote', ({ roomCode, userName, vote, itemId }) => {
     const room = rooms[roomCode];
     if (room && room.users[socket.id] && room.users[socket.id].name === userName && !room.revealed) {
-      console.log(`Vote in room ${roomCode} from ${userName}: ${vote}`);
+      console.log(`Vote in room ${roomCode} from ${userName}: ${vote} for item ${itemId}`);
       room.users[socket.id].vote = vote;
       room.votesByName[userName] = vote;
       io.to(roomCode).emit('allVotesUpdate', { votes: room.votesByName, revealed: room.revealed });
@@ -93,7 +103,6 @@ io.on('connection', (socket) => {
       console.log(`Show votes requested for room ${roomCode}`);
       room.revealed = true;
       io.to(roomCode).emit('allVotesUpdate', { votes: room.votesByName, revealed: room.revealed });
-      // Client-side will now use this updated allVotesUpdate to derive teams and decide on game
     }
   });
 
@@ -103,7 +112,19 @@ io.on('connection', (socket) => {
       console.log(`Game ended in room ${roomCode}, winning number: ${winningNumber}`);
       room.winningNumber = winningNumber;
       const teams = calculateTeams(room.votesByName);
-      io.to(roomCode).emit('roundResults', { teams, winningNumber: room.winningNumber });
+      
+      // Store the votes and winning number for the current item
+      const currentItemId = `item_${room.currentRound}`;
+      room.itemVotes[currentItemId] = {
+        votes: { ...room.votesByName },
+        winningNumber: winningNumber
+      };
+      
+      io.to(roomCode).emit('roundResults', { 
+        teams, 
+        winningNumber: room.winningNumber,
+        itemVotes: room.itemVotes
+      });
     }
   });
 
@@ -120,7 +141,10 @@ io.on('connection', (socket) => {
           delete room.users[id].vote;
         }
       }
-      io.to(roomCode).emit('startNextRound', { round: room.currentRound });
+      io.to(roomCode).emit('startNextRound', { 
+        round: room.currentRound,
+        itemVotes: room.itemVotes
+      });
     }
   });
 
