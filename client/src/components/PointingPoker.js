@@ -18,7 +18,7 @@ import PongGame from './games/PongGame';
 import RacingGame from './games/RacingGame';
 import ZombieGame from './games/ZombieGame';
 
-const SOCKET_SERVER_URL = 'http://localhost:4001';
+const SOCKET_SERVER_URL = 'https://72df-49-255-11-50.ngrok-free.app';
 const fibonacciNumbers = [0, 1, 2, 3, 5, 8, 13, 21, '☕', '?'];
 
 const PointingPoker = () => {
@@ -50,7 +50,12 @@ const PointingPoker = () => {
   }, []);
 
   useEffect(() => {
-    const newSocket = io(SOCKET_SERVER_URL);
+    //'ngrok-skip-browser-warning': 'true'
+    const newSocket = io(SOCKET_SERVER_URL, {
+      extraHeaders: {
+        'ngrok-skip-browser-warning': 'true'
+      }
+    });
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
