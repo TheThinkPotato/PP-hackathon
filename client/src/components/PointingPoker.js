@@ -15,6 +15,7 @@ import Alert from '@mui/material/Alert';
 // Game component imports - these should point to the actual game files
 import PongGame from './games/PongGame'; 
 import RacingGame from './games/RacingGame';
+import ZombieGame from './games/ZombieGame';
 
 const SOCKET_SERVER_URL = 'http://localhost:4001';
 const fibonacciNumbers = [0, 1, 2, 3, 5, 8, 13, 21, '☕', '?'];
@@ -355,7 +356,10 @@ const PointingPoker = () => {
                 )}
 
                 {currentGame === 'pong' && teams && <PongGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />}
-                {currentGame === 'racing' && teams && <RacingGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />}
+                 {currentGame === 'racing' && teams && <RacingGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />} 
+                {/*{currentGame === 'racing' && teams && <ZombieGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />}*/}
+
+
 
                 {winningNumber && !currentGame && (
                 <Box textAlign="center" sx={{ mt: 3 }}>
