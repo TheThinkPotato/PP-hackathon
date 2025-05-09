@@ -11,6 +11,7 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Alert from '@mui/material/Alert';
+import BacklogItems from './BacklogItems';
 
 // Game component imports - these should point to the actual game files
 import PongGame from './games/PongGame'; 
@@ -35,6 +36,8 @@ const PointingPoker = () => {
   const [currentGame, setCurrentGame] = useState(null);
   const [winningNumber, setWinningNumber] = useState(null);
   const [currentRound, setCurrentRound] = useState(1);
+  const [backlogVotes, setBacklogVotes] = useState({});
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
 
   const resetPokerStateForNewRound = useCallback(() => {
     setMyVote(null);
@@ -98,18 +101,24 @@ const PointingPoker = () => {
       setRevealed(updatedRevealed || false);
     });
 
-    newSocket.on('roundResults', ({ teams: newTeams, winningNumber: newWinningNumber }) => {
-      console.log('Round results:', newTeams, newWinningNumber);
+    newSocket.on('roundResults', ({ teams: newTeams, winningNumber: newWinningNumber, itemVotes }) => {
+      console.log('Round results:', newTeams, newWinningNumber, itemVotes);
       setTeams(newTeams || null);
       setWinningNumber(newWinningNumber || null);
       setRevealed(true);
       setCurrentGame(null);
+      if (itemVotes) {
+        setBacklogVotes(itemVotes);
+      }
     });
 
-    newSocket.on('startNextRound', ({ round }) => {
+    newSocket.on('startNextRound', ({ round, itemVotes }) => {
       console.log('Server started next round:', round);
       resetPokerStateForNewRound();
       setCurrentRound(round);
+      if (itemVotes) {
+        setBacklogVotes(itemVotes);
+      }
       setErrorMessage('');
     });
     
@@ -155,7 +164,12 @@ const PointingPoker = () => {
   const handleVote = (number) => {
     if (socket && isRoomJoined && !revealed && userName && roomCode) {
       setMyVote(number);
-      socket.emit('vote', { roomCode, userName, vote: number });
+      socket.emit('vote', { 
+        roomCode, 
+        userName, 
+        vote: number,
+        itemId: `item_${currentRound}`
+      });
     }
   };
 
@@ -167,14 +181,26 @@ const PointingPoker = () => {
 
   const handleGameEnd = useCallback((chosenNumber) => {
     if (socket && isRoomJoined && roomCode && !winningNumber) {
+      setBacklogVotes(prev => ({
+        ...prev,
+        [`item_${currentRound}`]: {
+          votes: allVotes,
+          winningNumber: chosenNumber
+        }
+      }));
+
       socket.emit('gameEnded', { roomCode, winningNumber: chosenNumber });
     }
-  }, [socket, isRoomJoined, roomCode, winningNumber]);
+  }, [socket, isRoomJoined, roomCode, winningNumber, currentRound, allVotes]);
 
   const handleNextRound = () => {
     if (socket && isRoomJoined && roomCode) {
-      console.log('Client requesting next round for room:', roomCode);
-      socket.emit('requestNextRound', { roomCode });
+      if (currentRound >= 5) {
+        setIsSessionComplete(true);
+      } else {
+        console.log('Client requesting next round for room:', roomCode);
+        socket.emit('requestNextRound', { roomCode });
+      }
     }
   };
   
@@ -294,6 +320,13 @@ const PointingPoker = () => {
                     </ListItem>
                     ))}
                 </List>
+                <BacklogItems 
+                  currentRound={currentRound} 
+                  allVotes={backlogVotes}
+                  players={players}
+                  revealed={revealed}
+                  isSessionComplete={isSessionComplete}
+                />
             </Grid>
 
             <Grid item xs={12} md={9}>
