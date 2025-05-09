@@ -46,7 +46,6 @@ const PointingPoker = () => {
     setTeams(null);
     setCurrentGame(null);
     setWinningNumber(null);
-    setCurrentRound(1);
   }, []);
 
   useEffect(() => {
@@ -108,7 +107,35 @@ const PointingPoker = () => {
       setRevealed(true);
       setCurrentGame(null);
       if (itemVotes) {
-        setBacklogVotes(itemVotes);
+        setBacklogVotes(prev => {
+          const updatedBacklog = { ...prev };
+          for (const itemKey in itemVotes) {
+            const serverItemData = itemVotes[itemKey] || {};
+            const clientItemData = prev[itemKey] || {};
+
+            const mergedData = { ...clientItemData }; // Start with client data
+
+            // Overlay non-critical server data
+            for (const propKey in serverItemData) {
+              if (propKey !== 'winningNumber' && propKey !== 'votes') {
+                mergedData[propKey] = serverItemData[propKey];
+              }
+            }
+
+            // Intelligently set winningNumber
+            mergedData.winningNumber = (serverItemData.hasOwnProperty('winningNumber') && serverItemData.winningNumber !== undefined && serverItemData.winningNumber !== null)
+              ? serverItemData.winningNumber
+              : clientItemData.winningNumber;
+
+            // Intelligently set votes
+            mergedData.votes = (serverItemData.hasOwnProperty('votes') && serverItemData.votes && typeof serverItemData.votes === 'object' && Object.keys(serverItemData.votes).length > 0)
+              ? serverItemData.votes
+              : clientItemData.votes;
+
+            updatedBacklog[itemKey] = mergedData;
+          }
+          return updatedBacklog;
+        });
       }
     });
 
@@ -117,7 +144,35 @@ const PointingPoker = () => {
       resetPokerStateForNewRound();
       setCurrentRound(round);
       if (itemVotes) {
-        setBacklogVotes(itemVotes);
+        setBacklogVotes(prev => {
+          const updatedBacklog = { ...prev };
+          for (const itemKey in itemVotes) {
+            const serverItemData = itemVotes[itemKey] || {};
+            const clientItemData = prev[itemKey] || {};
+
+            const mergedData = { ...clientItemData }; // Start with client data
+
+            // Overlay non-critical server data
+            for (const propKey in serverItemData) {
+              if (propKey !== 'winningNumber' && propKey !== 'votes') {
+                mergedData[propKey] = serverItemData[propKey];
+              }
+            }
+
+            // Intelligently set winningNumber
+            mergedData.winningNumber = (serverItemData.hasOwnProperty('winningNumber') && serverItemData.winningNumber !== undefined && serverItemData.winningNumber !== null)
+              ? serverItemData.winningNumber
+              : clientItemData.winningNumber;
+
+            // Intelligently set votes
+            mergedData.votes = (serverItemData.hasOwnProperty('votes') && serverItemData.votes && typeof serverItemData.votes === 'object' && Object.keys(serverItemData.votes).length > 0)
+              ? serverItemData.votes
+              : clientItemData.votes;
+
+            updatedBacklog[itemKey] = mergedData;
+          }
+          return updatedBacklog;
+        });
       }
       setErrorMessage('');
     });
