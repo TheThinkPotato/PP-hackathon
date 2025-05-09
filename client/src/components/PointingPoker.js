@@ -202,9 +202,19 @@ const PointingPoker = () => {
       setTeams(currentTeams);
 
       const numTeams = Object.keys(currentTeams).length;
-      if (numTeams === 2) setCurrentGame('pong');
-      else if (numTeams > 2 && numTeams <= 5) setCurrentGame('racing');
-      else if (numTeams === 1 && Object.keys(allVotes).length > 0) {
+      if (numTeams === 2) {
+        setCurrentGame('pong');
+        if (socket && roomCode) {
+          console.log('[PointingPoker] Requesting server to start pong game for room:', roomCode, 'with teams:', currentTeams);
+          socket.emit('startPongGame', { roomCode, teams: currentTeams });
+        }
+      } else if (numTeams > 2 && numTeams <= 5) {
+        setCurrentGame('racing');
+        if (socket && roomCode) {
+          console.log('Requesting server to start racing game for room:', roomCode, 'with teams:', currentTeams);
+          socket.emit('startRacingGame', { roomCode, teams: currentTeams });
+        }
+      } else if (numTeams === 1 && Object.keys(currentTeams).length > 0) {
         const singleWinningNumber = Object.keys(currentTeams)[0];
         if (socket && roomCode) socket.emit('gameEnded', { roomCode, winningNumber: singleWinningNumber });
       } else {
@@ -354,8 +364,22 @@ const PointingPoker = () => {
                     <Typography variant="body1" align="center" sx={{mt: 2}}>Calculating teams...</Typography>
                 )}
 
-                {currentGame === 'pong' && teams && <PongGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />}
-                {currentGame === 'racing' && teams && <RacingGame teams={teams} onGameEnd={handleGameEnd} myName={userName} winningNumber={winningNumber} />}
+                {currentGame === 'pong' && teams && <PongGame 
+                    teams={teams} 
+                    onGameEnd={handleGameEnd} 
+                    myName={userName} 
+                    winningNumber={winningNumber} 
+                    socket={socket}
+                    roomCode={roomCode}
+                />}
+                {currentGame === 'racing' && teams && <RacingGame 
+                    teams={teams} 
+                    onGameEnd={handleGameEnd} 
+                    myName={userName} 
+                    winningNumber={winningNumber}
+                    socket={socket}
+                    roomCode={roomCode}
+                />}
 
                 {winningNumber && !currentGame && (
                 <Box textAlign="center" sx={{ mt: 3 }}>
