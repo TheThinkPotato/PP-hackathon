@@ -38,37 +38,44 @@ const BacklogItems = ({ currentRound, allVotes, players, revealed, isSessionComp
   // If session is complete, show the final summary
   if (isSessionComplete) {
     return (
-      <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper elevation={3} sx={{ p: { xs: 1.5, sm: 2.5 }, borderRadius: '8px', width: '100%' }}>
+        <Typography variant="h5" component="h3" gutterBottom sx={{ color: 'primary.dark', fontWeight: 'medium', mb: 2 }}>
           Session Summary
         </Typography>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
+        <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '4px' }}>
+          <Table aria-label="session summary table">
+            <TableHead sx={{ bgcolor: 'grey[100]' }}>
               <TableRow>
-                <TableCell>Item</TableCell>
-                <TableCell>Priority</TableCell>
-                <TableCell>Final Score</TableCell>
-                <TableCell>Votes</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Item</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Priority</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Score</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Votes Cast</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {backlogItems.map((item, index) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <Typography variant="subtitle2">{item.title}</Typography>
-                    <Typography variant="caption" color="text.secondary">
+                <TableRow key={item.id} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' } }}>
+                  <TableCell component="th" scope="row">
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>{item.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">
                       {item.description}
                     </Typography>
                   </TableCell>
                   <TableCell>{item.priority}</TableCell>
-                  <TableCell>{allVotes[`item_${index + 1}`]?.winningNumber || 'N/A'}</TableCell>
+                  <TableCell align="right">
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
+                      {allVotes[`item_${index + 1}`]?.winningNumber || '-'}
+                    </Typography>
+                  </TableCell>
                   <TableCell>
-                    {Object.entries(allVotes[`item_${index + 1}`]?.votes || {}).map(([player, vote]) => (
-                      <Typography key={player} variant="caption" display="block">
-                        {player}: {vote}
-                      </Typography>
-                    ))}
+                    {Object.entries(allVotes[`item_${index + 1}`]?.votes || {}).length > 0 ? 
+                      Object.entries(allVotes[`item_${index + 1}`].votes).map(([player, vote]) => (
+                        <Typography key={player} variant="body2" display="block" sx={{ fontSize: '0.8rem' }}>
+                          {player}: <strong>{vote}</strong>
+                        </Typography>
+                      )) : 
+                      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>No votes</Typography>
+                    }
                   </TableCell>
                 </TableRow>
               ))}
@@ -85,34 +92,34 @@ const BacklogItems = ({ currentRound, allVotes, players, revealed, isSessionComp
   const previousItems = backlogItems.slice(0, currentRound - 1);
 
   return (
-    <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
+    <Box sx={{ width: '100%' }}>
       {previousItems.length > 0 && (
         <Box mb={3}>
-          <Typography variant="h6" gutterBottom>
+          <Typography variant="h6" gutterBottom sx={{ color: 'primary.dark', mb: 1.5 }}>
             Previously Voted Items
           </Typography>
           {previousItems.map((item, index) => {
             const itemKey = `item_${index + 1}`;
             const itemVoteData = allVotes[itemKey];
             return (
-              <Box key={item.id} sx={{ mb: 2, p: 1.5, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                <Typography variant="subtitle1" gutterBottom>{item.title}</Typography>
-                <Typography variant="body2" color="text.secondary">{item.description}</Typography>
-                <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>Priority: {item.priority}</Typography>
-                <Typography variant="caption" display="block" sx={{ fontWeight: 'bold' }}>
-                  Final Score: {itemVoteData?.winningNumber !== undefined && itemVoteData?.winningNumber !== null ? itemVoteData.winningNumber : 'N/A'}
+              <Paper key={item.id} elevation={1} sx={{ mb: 1.5, p: 1.5, borderRadius: '6px', border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium' }}>{item.title}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>{item.description}</Typography>
+                <Typography variant="caption" display="block" color="text.secondary">Priority: {item.priority}</Typography>
+                <Typography variant="subtitle2" display="block" sx={{ mt: 0.5, fontWeight: 'bold', color: 'secondary.dark' }}>
+                  Final Score: {itemVoteData?.winningNumber !== undefined && itemVoteData?.winningNumber !== null ? itemVoteData.winningNumber : '-'}
                 </Typography>
                 {itemVoteData?.votes && Object.keys(itemVoteData.votes).length > 0 && (
                   <Box mt={1}>
                     <Typography variant="caption" sx={{ fontWeight: 'medium' }}>Votes:</Typography>
                     {Object.entries(itemVoteData.votes).map(([player, vote]) => (
-                      <Typography key={player} variant="caption" display="block" sx={{ pl: 1}}>
-                        {player}: {vote}
+                      <Typography key={player} variant="caption" display="block" sx={{ pl: 1, fontSize: '0.75rem' }}>
+                        {player}: <strong>{vote}</strong>
                       </Typography>
                     ))}
                   </Box>
                 )}
-              </Box>
+              </Paper>
             );
           })}
           <Divider sx={{ my: 2 }}/>
@@ -121,49 +128,50 @@ const BacklogItems = ({ currentRound, allVotes, players, revealed, isSessionComp
 
       {currentItem && (
         <Box>
-          <Typography variant="h6" gutterBottom>
-            Current Backlog Item ({currentRound} of {backlogItems.length})
+          <Typography variant="h6" gutterBottom sx={{ color: 'primary.dark', mb: 1 }}>
+            Current Item ({currentRound}/{backlogItems.length}): <Typography component="span" sx={{ fontWeight: 'medium' }}>{currentItem.title}</Typography>
           </Typography>
-          <List>
-            <ListItem sx={{pl:0}}>
-              <ListItemText
-                primary={
-                  <Typography variant="subtitle1" component="div">
-                    {currentItem.title}
+          <Paper elevation={1} sx={{ p: 1.5, borderRadius: '6px', border: '1px solid', borderColor: 'divider', mb: revealed ? 2 : 0 }}>
+            <ListItemText
+              primary={
+                <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'medium' }}>
+                  {currentItem.title}
+                </Typography>
+              }
+              secondary={
+                <>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    {currentItem.description}
                   </Typography>
-                }
-                secondary={
-                  <>
-                    <Typography variant="body2" color="text.secondary">
-                      {currentItem.description}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      Priority: {currentItem.priority}
-                    </Typography>
-                  </>
-                }
-              />
-            </ListItem>
-          </List>
+                  <Typography variant="caption" color="text.secondary">
+                    Priority: {currentItem.priority}
+                  </Typography>
+                </>
+              }
+              sx={{m:0}}
+            />
+          </Paper>
 
-          {revealed && (
+          {revealed && Object.keys(currentItemVotes).length > 0 && (
             <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Votes for this item:
+              <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'medium', color: 'primary.dark' }}>
+                Votes for Current Item:
               </Typography>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
+              <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: '4px' }}>
+                <Table size="small" aria-label="current item votes table">
+                  <TableHead sx={{ bgcolor: 'grey[100]' }}>
                     <TableRow>
-                      <TableCell>Player</TableCell>
-                      <TableCell>Vote</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Player</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Vote</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {players.map((player) => (
-                      <TableRow key={player}>
+                      <TableRow key={player} sx={{ '&:nth-of-type(odd)': { backgroundColor: 'action.hover' } }}>
                         <TableCell>{player}</TableCell>
-                        <TableCell>{currentItemVotes[player] || 'Not voted'}</TableCell>
+                        <TableCell sx={{ fontWeight: currentItemVotes[player] ? 'bold' : 'normal' }}>
+                            {currentItemVotes[player] || <Typography variant="caption" sx={{color: 'text.disabled', fontStyle: 'italic'}}>Not voted</Typography>}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -171,9 +179,12 @@ const BacklogItems = ({ currentRound, allVotes, players, revealed, isSessionComp
               </TableContainer>
             </Box>
           )}
+          {revealed && Object.keys(currentItemVotes).length === 0 && (
+             <Typography variant="body2" color="text.secondary" sx={{mt: 1, fontStyle: 'italic'}}>No votes recorded for the current item yet.</Typography>
+          )}
         </Box>
       )}
-    </Paper>
+    </Box>
   );
 };
 

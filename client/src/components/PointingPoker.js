@@ -327,12 +327,12 @@ const PointingPoker = () => {
 
   if (!isRoomJoined) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 4 }}>
-        <Paper elevation={3} sx={{ p: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom align="center">
+      <Container component="main" maxWidth="xs" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 64px)' /* Adjust 64px if you have a header */ }}>
+        <Paper elevation={6} sx={{ p: 4, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', borderRadius: '12px' }}>
+          <Typography component="h1" variant="h4" sx={{ mb: 3, color: 'primary.main', fontWeight: 'bold' }}>
             Pointing Poker
           </Typography>
-          {errorMessage && <Alert severity="error" sx={{ mb: 2 }}>{errorMessage}</Alert>}
+          {errorMessage && <Alert severity="error" sx={{ mb: 2, width: '100%' }}>{errorMessage}</Alert>}
           <TextField
             label="Your Name"
             value={userName}
@@ -340,20 +340,39 @@ const PointingPoker = () => {
             fullWidth
             margin="normal"
             required
+            variant="outlined"
+            sx={{ mb: 2 }}
           />
-          <Button onClick={handleCreateRoom} variant="contained" fullWidth sx={{ mt: 2, mb:1 }} disabled={!userName.trim()}>
+          <Button
+            onClick={handleCreateRoom}
+            variant="contained"
+            fullWidth
+            sx={{ mt: 2, mb: 1, py: 1.5, borderRadius: '8px', fontWeight: 'medium' }}
+            disabled={!userName.trim()}
+          >
             Create New Room
           </Button>
-          <Typography align="center" sx={{my:1}}>OR</Typography>
+          <Typography align="center" sx={{ my: 2, color: 'text.secondary' }}>
+            OR
+          </Typography>
           <TextField
             label="Room Code"
             value={inputRoomCode}
             onChange={(e) => setInputRoomCode(e.target.value.toUpperCase())}
             fullWidth
             margin="normal"
-            inputProps={{ maxLength: 5, style: { textTransform: 'uppercase' } }}
+            required
+            variant="outlined"
+            inputProps={{ maxLength: 5, style: { textTransform: 'uppercase', textAlign: 'center' }, "aria-label": "Room Code" }}
+            sx={{ mb: 1 }}
           />
-          <Button onClick={handleJoinRoom} variant="outlined" fullWidth sx={{ mt:1 }} disabled={!userName.trim() || !inputRoomCode.trim()}>
+          <Button
+            onClick={handleJoinRoom}
+            variant="outlined"
+            fullWidth
+            sx={{ mt: 1, mb: 2, py: 1.5, borderRadius: '8px', fontWeight: 'medium' }}
+            disabled={!userName.trim() || !inputRoomCode.trim()}
+          >
             Join Room
           </Button>
         </Paper>
@@ -363,101 +382,141 @@ const PointingPoker = () => {
 
   // Main Poker Room UI
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Paper elevation={3} sx={{ p: 3 }}>
-        <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2}}>
-            <Typography variant="h4" component="h1">
-            Pointing Poker - Round {currentRound}
-            </Typography>
-            <Button onClick={handleLeaveRoom} variant="outlined" color="error" size="small">Leave Room</Button>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Paper elevation={6} sx={{ p: { xs: 2, sm: 3 }, borderRadius: '12px' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap' }}>
+          <Typography variant="h4" component="h1" sx={{ color: 'primary.main', fontWeight: 'bold', mb: { xs: 1, sm: 0 } }}>
+            Round {currentRound}
+          </Typography>
+          <Button 
+              onClick={handleLeaveRoom} 
+              variant="outlined" 
+              color="error" 
+              sx={{ py: 0.8, borderRadius: '8px', fontWeight: 'medium' }}
+          >
+              Leave Room
+          </Button>
         </Box>
-        <Typography variant="subtitle1" gutterBottom>
-            Room Code: <strong>{roomCode}</strong> (Share this with others) | Your Name: <strong>{userName}</strong>
+        <Typography variant="body1" sx={{ mb: 3, color: 'text.secondary' }}>
+          Room: <strong>{roomCode}</strong> | User: <strong>{userName}</strong>
         </Typography>
         
-        {errorMessage && <Alert severity="error" sx={{ mb: 2 }}>{errorMessage}</Alert>}
+        {errorMessage && <Alert severity="error" sx={{ mb: 2, width: '100%' }}>{errorMessage}</Alert>}
 
-        <Grid container spacing={2}>
+        <Grid container spacing={3}>
             <Grid item xs={12} md={3}>
-                <Typography variant="h6">Players ({players.length}):</Typography>
-                <List dense>
-                    {players.map((player, index) => (
-                    <ListItem key={index} sx={{bgcolor: player === userName ? 'action.hover' : 'transparent'}}>
-                        <ListItemText primary={player} />
+              <Paper sx={{ p: 2, borderRadius: '8px', height: '100%' }}>
+                <Typography variant="h6" sx={{ mb: 1, color: 'primary.dark' }}>Players ({players.length})</Typography>
+                <List dense sx={{ maxHeight: '200px', overflow: 'auto', mb: 2 }}>
+                  {players.map((player, index) => (
+                    <ListItem 
+                      key={index} 
+                      sx={{ 
+                        bgcolor: player === userName ? 'primary.light' : 'transparent', 
+                        color: player === userName ? 'primary.contrastText' : 'text.primary',
+                        borderRadius: '4px', 
+                        mb: 0.5 
+                      }}
+                    >
+                      <ListItemText primary={player} />
                     </ListItem>
-                    ))}
+                  ))}
                 </List>
-                <BacklogItems 
-                  currentRound={currentRound} 
-                  allVotes={backlogVotes}
-                  players={players}
-                  revealed={revealed}
-                  isSessionComplete={isSessionComplete}
-                />
+              </Paper>
             </Grid>
 
             <Grid item xs={12} md={9}>
                 {winningNumber && (
-                <Typography variant="h5" component="h2" color="primary" gutterBottom align="center" sx={{mb: 2}}>
-                    Winning Number for Round {currentRound > 1 ? currentRound -1 : 'Previous'}: {winningNumber}
-                </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3, p: 2, background: (theme) => theme.palette.success.light, borderRadius: '8px' }}>
+                    <Typography variant="h5" component="h2" sx={{ color: (theme) => theme.palette.success.contrastText, fontWeight: 'medium' }}>
+                      Round {currentRound > 1 ? currentRound -1 : 'Previous'} Result: {winningNumber}
+                    </Typography>
+                  </Box>
                 )}
 
                 {!currentGame && !winningNumber && (
-                <>
-                    <Typography variant="h6" gutterBottom align="center">
-                    {revealed ? "Votes are in!" : "Cast your vote!"}
+                  <Paper sx={{ p: {xs: 2, sm: 3}, borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <Typography variant="h5" component="h2" sx={{ mb: 3, color: 'primary.main', fontWeight: 'medium' }}>
+                      {revealed ? "Votes Revealed!" : "Cast Your Vote"}
                     </Typography>
-                    <Grid container spacing={1} justifyContent="center" sx={{ mb: 3 }}>
-                    {fibonacciNumbers.map((number) => (
-                        <Grid item key={number}>
-                        <Button
+                    <Grid container spacing={1} justifyContent="center" sx={{ mb: 3, maxWidth: '600px' }}>
+                      {fibonacciNumbers.map((number) => (
+                        <Grid item key={number} xs={3} sm={'auto'}>
+                          <Button
                             variant={myVote === number ? "contained" : "outlined"}
                             onClick={() => handleVote(number)}
                             disabled={revealed || !!allVotes[userName] || winningNumber}
-                            size="large"
-                        >
+                            sx={{ 
+                              minWidth: {xs: 'auto', sm: '50px'}, 
+                              height: '50px', 
+                              fontSize: '1.1rem', 
+                              borderRadius: '8px',
+                              width: '100%'
+                            }}
+                          >
                             {number}
-                        </Button>
+                          </Button>
                         </Grid>
-                    ))}
+                      ))}
                     </Grid>
 
                     {!revealed && (
-                    <Box textAlign="center" sx={{ mb: 2 }}>
-                        <Button variant="contained" color="secondary" onClick={handleShowVotes} 
-                                disabled={Object.keys(allVotes).length === 0 || Object.keys(allVotes).length < players.length || winningNumber}
+                      <Box sx={{ mb: 2, width: '100%', maxWidth: '300px' }}>
+                        <Button 
+                          variant="contained" 
+                          color="secondary" // Keep secondary for this distinct action
+                          onClick={handleShowVotes}
+                          disabled={Object.keys(allVotes).length === 0 || Object.keys(allVotes).length < players.length || winningNumber}
+                          fullWidth
+                          sx={{ py: 1.5, borderRadius: '8px', fontWeight: 'medium' }}
                         >
-                        Show Votes ( {Object.keys(allVotes).length} / {players.length} voted )
+                          Show Votes ({Object.keys(allVotes).length}/{players.length})
                         </Button>
-                    </Box>
+                      </Box>
                     )}
-                </>
+                  </Paper>
                 )}
 
                 {revealed && teams && !currentGame && !winningNumber && (
-                <Box sx={{ mt: 3 }}>
-                    <Typography variant="h6" gutterBottom align="center">Teams based on votes:</Typography>
+                  <Box sx={{ mt: 4, width: '100%' }}>
+                    <Typography variant="h5" component="h2" sx={{ mb: 3, color: 'primary.main', fontWeight: 'medium', textAlign: 'center' }}>
+                      Teams Formed
+                    </Typography>
                     {Object.keys(teams).length > 0 ? (
-                        <Grid container spacing={2} justifyContent="center">
+                      <Grid container spacing={2} justifyContent="center">
                         {Object.entries(teams).map(([vote, teamUsers]) => (
-                            <Grid item key={vote} xs={12} sm={6} md={4}>
-                            <Paper elevation={2} sx={{ p: 2, backgroundColor: getTeamColor(vote), color: 'white' }}>
-                                <Typography variant="h5" align="center">Vote: {vote}</Typography>
-                                <Typography variant="body2" align="center">Players: {teamUsers.length} ({teamUsers.join(', ')})</Typography>
+                          <Grid item key={vote} xs={12} sm={6} md={4} lg={3}>
+                            <Paper 
+                              elevation={3} 
+                              sx={{ 
+                                p: 2, 
+                                backgroundColor: getTeamColor(vote), 
+                                color: (theme) => theme.palette.getContrastText(getTeamColor(vote)), // Ensure text contrast
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                height: '100%'
+                              }}
+                            >
+                              <Typography variant="h4" sx={{ fontWeight: 'bold' }}>{vote}</Typography>
+                              <Typography variant="body1" sx={{ mt: 1 }}>{teamUsers.length} Player{teamUsers.length === 1 ? '' : 's'}</Typography>
+                              <Typography variant="caption" sx={{ textAlign: 'center' }}>({teamUsers.join(', ')})</Typography>
                             </Paper>
-                            </Grid>
+                          </Grid>
                         ))}
-                        </Grid>
+                      </Grid>
                     ) : (
-                        <Typography align="center" sx={{mt:1}}>No consensus or all unique votes. Waiting for game decision or next round.</Typography>
+                      <Typography align="center" sx={{mt: 2, color: 'text.secondary'}}>
+                        No clear consensus for teams.
+                      </Typography>
                     )}
                     {!currentGame && Object.keys(teams).length > 0 && (
-                        <Typography variant="caption" display="block" sx={{ mt: 2, textAlign: 'center' }}>
-                            Game will start based on team count if applicable...
-                        </Typography>
+                      <Typography variant="body2" display="block" sx={{ mt: 3, textAlign: 'center', color: 'text.secondary' }}>
+                        A mini-game might start based on the number of teams formed.
+                      </Typography>
                     )}
-                </Box>
+                  </Box>
                 )}
                 
                 {revealed && Object.keys(allVotes).length > 0 && !teams && !winningNumber && !currentGame && (
@@ -490,12 +549,31 @@ const PointingPoker = () => {
                 />}
 
                 {winningNumber && !currentGame && (
-                <Box textAlign="center" sx={{ mt: 3 }}>
-                    <Button variant="contained" color="primary" onClick={handleNextRound} size="large">
-                    Start Next Round ({currentRound})
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, mb: 2 }}>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      onClick={handleNextRound} 
+                      sx={{ py: 1.5, px: 4, borderRadius: '8px', fontWeight: 'medium', fontSize: '1.1rem' }}
+                    >
+                      Start Next Round ({currentRound})
                     </Button>
-                </Box>
+                  </Box>
                 )}
+            </Grid>
+
+            {/* New full-width row for BacklogItems */}
+            <Grid item xs={12} sx={{ mt: 4 }}>
+                <Typography variant="h5" component="h2" sx={{ mb: 2, color: 'primary.dark', fontWeight: 'bold' }}>
+                    Backlog Progress
+                </Typography>
+                <BacklogItems 
+                  currentRound={currentRound} 
+                  allVotes={backlogVotes}
+                  players={players}
+                  revealed={revealed}
+                  isSessionComplete={isSessionComplete}
+                />
             </Grid>
         </Grid>
       </Paper>
