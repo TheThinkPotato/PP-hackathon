@@ -498,20 +498,6 @@ const PointingPoker = () => {
                 )}
             </Grid>
         </Grid>
-
-        <Box sx={{ mt: 4, p: 2, border: '1px solid #eee', borderRadius: '4px' }}>
-            <Typography variant="h6">Notes for Game Developers:</Typography>
-            <Typography variant="body2" component="div">
-                <ul>
-                    <li>Game components (e.g., <code>PongGame</code>, <code>RacingGame</code>) are rendered conditionally.</li>
-                    <li>Each game component receives a <code>teams</code> prop: <code>{`{{ '3': ['Alice', 'Bob'], '8': ['Charlie'] }}`}</code> (usernames).</li>
-                    <li>Each game component receives an <code>onGameEnd(winningVote)</code> function to call with the winning number.</li>
-                    <li>Each game component now also receives <code>myName</code> prop (current user's name).</li>
-                    <li>Server: <code>server/server.js</code>. Client: <code>client/src/components/PointingPoker.js</code>.</li>
-                    <li>New Game Integration: Update <code>PointingPoker.js</code> useEffect (around line 200) for team-to-game logic.</li>
-                </ul>
-            </Typography>
-        </Box>
       </Paper>
     </Container>
   );
