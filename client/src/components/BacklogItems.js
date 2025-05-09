@@ -79,60 +79,98 @@ const BacklogItems = ({ currentRound, allVotes, players, revealed, isSessionComp
     );
   }
 
-  // Show current item and voting status
+  // Show current item and voting status, plus previous items
   const currentItem = backlogItems[currentRound - 1];
   const currentItemVotes = allVotes[`item_${currentRound}`]?.votes || {};
+  const previousItems = backlogItems.slice(0, currentRound - 1);
 
   return (
     <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        Current Backlog Item ({currentRound} of {backlogItems.length})
-      </Typography>
-      <List>
-        <ListItem>
-          <ListItemText
-            primary={
-              <Typography variant="subtitle1" component="div">
-                {currentItem.title}
-              </Typography>
-            }
-            secondary={
-              <>
-                <Typography variant="body2" color="text.secondary">
-                  {currentItem.description}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Priority: {currentItem.priority}
-                </Typography>
-              </>
-            }
-          />
-        </ListItem>
-      </List>
-
-      {revealed && (
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            Votes for this item:
+      {previousItems.length > 0 && (
+        <Box mb={3}>
+          <Typography variant="h6" gutterBottom>
+            Previously Voted Items
           </Typography>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Player</TableCell>
-                  <TableCell>Vote</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {players.map((player) => (
-                  <TableRow key={player}>
-                    <TableCell>{player}</TableCell>
-                    <TableCell>{currentItemVotes[player] || 'Not voted'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          {previousItems.map((item, index) => {
+            const itemKey = `item_${index + 1}`;
+            const itemVoteData = allVotes[itemKey];
+            return (
+              <Box key={item.id} sx={{ mb: 2, p: 1.5, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                <Typography variant="subtitle1" gutterBottom>{item.title}</Typography>
+                <Typography variant="body2" color="text.secondary">{item.description}</Typography>
+                <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>Priority: {item.priority}</Typography>
+                <Typography variant="caption" display="block" sx={{ fontWeight: 'bold' }}>
+                  Final Score: {itemVoteData?.winningNumber !== undefined && itemVoteData?.winningNumber !== null ? itemVoteData.winningNumber : 'N/A'}
+                </Typography>
+                {itemVoteData?.votes && Object.keys(itemVoteData.votes).length > 0 && (
+                  <Box mt={1}>
+                    <Typography variant="caption" sx={{ fontWeight: 'medium' }}>Votes:</Typography>
+                    {Object.entries(itemVoteData.votes).map(([player, vote]) => (
+                      <Typography key={player} variant="caption" display="block" sx={{ pl: 1}}>
+                        {player}: {vote}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            );
+          })}
+          <Divider sx={{ my: 2 }}/>
+        </Box>
+      )}
+
+      {currentItem && (
+        <Box>
+          <Typography variant="h6" gutterBottom>
+            Current Backlog Item ({currentRound} of {backlogItems.length})
+          </Typography>
+          <List>
+            <ListItem sx={{pl:0}}>
+              <ListItemText
+                primary={
+                  <Typography variant="subtitle1" component="div">
+                    {currentItem.title}
+                  </Typography>
+                }
+                secondary={
+                  <>
+                    <Typography variant="body2" color="text.secondary">
+                      {currentItem.description}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Priority: {currentItem.priority}
+                    </Typography>
+                  </>
+                }
+              />
+            </ListItem>
+          </List>
+
+          {revealed && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Votes for this item:
+              </Typography>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Player</TableCell>
+                      <TableCell>Vote</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {players.map((player) => (
+                      <TableRow key={player}>
+                        <TableCell>{player}</TableCell>
+                        <TableCell>{currentItemVotes[player] || 'Not voted'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
         </Box>
       )}
     </Paper>

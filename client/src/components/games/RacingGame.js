@@ -16,7 +16,7 @@ const WINNING_LAPS = 3;
 
 const TRACK_PADDING = 70;
 const TRACK_LANE_WIDTH = 80;
-const CORNER_RADIUS_OUTER = TRACK_LANE_WIDTH;
+const CORNER_RADIUS_OUTER = 120;
 
 const trackOuterPoints = {
     TL: { x: TRACK_PADDING, y: TRACK_PADDING },
@@ -26,18 +26,23 @@ const trackOuterPoints = {
 };
 
 const R_center = CORNER_RADIUS_OUTER - TRACK_LANE_WIDTH / 2;
+
+// New, more complex track path waypoints (example: P-shape)
 const trackPathWaypoints = [
-    { x: trackOuterPoints.BL.x + R_center, y: trackOuterPoints.BL.y - R_center }, 
-    { x: trackOuterPoints.BR.x - R_center, y: trackOuterPoints.BR.y - R_center }, 
-    { x: trackOuterPoints.BR.x - R_center, y: trackOuterPoints.TR.y + R_center }, 
-    { x: trackOuterPoints.TR.x - R_center, y: trackOuterPoints.TR.y + R_center }, 
-    { x: trackOuterPoints.TL.x + R_center, y: trackOuterPoints.TL.y + R_center }, 
-    { x: trackOuterPoints.TL.x + R_center, y: trackOuterPoints.BL.y - R_center }, 
+    { x: CANVAS_WIDTH * 0.2, y: CANVAS_HEIGHT * 0.8 }, // Point 0: Start of bottom straight
+    { x: CANVAS_WIDTH * 0.6, y: CANVAS_HEIGHT * 0.8 }, // Point 1: End of bottom straight
+    { x: CANVAS_WIDTH * 0.8, y: CANVAS_HEIGHT * 0.6 }, // Point 2: Start of upward curve
+    { x: CANVAS_WIDTH * 0.7, y: CANVAS_HEIGHT * 0.3 }, // Point 3: End of upward curve / Start of top loop
+    { x: CANVAS_WIDTH * 0.5, y: CANVAS_HEIGHT * 0.15 },// Point 4: Apex of top loop
+    { x: CANVAS_WIDTH * 0.3, y: CANVAS_HEIGHT * 0.3 }, // Point 5: End of top loop / Start of downward curve
+    { x: CANVAS_WIDTH * 0.2, y: CANVAS_HEIGHT * 0.5 }  // Point 6: End of downward curve, leads back to point 0
+    // Path implicitly connects point 6 back to point 0
 ];
 
-const FINISH_LINE_Y_CENTER = trackOuterPoints.BL.y - R_center;
-const FINISH_LINE_X_START = trackOuterPoints.BL.x + R_center + CAR_WIDTH * 2;
-const FINISH_LINE_X_END = FINISH_LINE_X_START + 100;
+// Adjust Finish Line to be on the first straight segment of the new path
+const FINISH_LINE_Y_CENTER = trackPathWaypoints[0].y;
+const FINISH_LINE_X_START = trackPathWaypoints[0].x + (trackPathWaypoints[1].x - trackPathWaypoints[0].x) * 0.25; // Start 1/4 way along the segment
+const FINISH_LINE_X_END = FINISH_LINE_X_START + 100; // Keep similar length for now
 
 const carColors = ['#FF5733', '#33FF57', '#3357FF', '#FF33A1', '#F1C40F', '#1ABC9C', '#9B59B6', '#34495E'];
 
@@ -67,6 +72,7 @@ const RacingGame = ({ teams, onGameEnd, myName, winningNumber: officialWinningNu
     const keysPressed = useRef({});
     const isControllingCarRef = useRef(false);
     const myCarIdRef = useRef(null);
+    const hasReportedOffTrackRef = useRef(false);
 
     const [cars, setCars] = useState([]);
     const [gameMessage, setGameMessage] = useState('Waiting for server to start game...');
@@ -146,36 +152,51 @@ const RacingGame = ({ teams, onGameEnd, myName, winningNumber: officialWinningNu
     }, [countdown, gameStarted, gameOver, cars.length]);
 
     const handleKeyDown = useCallback((e) => {
-        if (gameOver || !gameStarted || !isControllingCarRef.current || !myCarIdRef.current) return;
+        const isGameKey = ['ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key);
 
-        if (['ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-            e.preventDefault();
-            if (!keysPressed.current[e.key]) {
-                socket.emit('playerRacingInput', { 
-                    roomCode, 
-                    carId: myCarIdRef.current, 
-                    inputKey: e.key, 
-                    pressed: true 
+        if (isGameKey) {
+            e.preventDefault(); // Prevent default for game keys in ALL windows
+        }
+
+        // Conditions for this window to ACTUALLY control its assigned car
+        if (gameOver || !gameStarted || !isControllingCarRef.current || !myCarIdRef.current) {
+            return; // This window isn't supposed to control a car, or game isn't ready/active
+        }
+
+        if (isGameKey) {
+            if (!keysPressed.current[e.key]) { // If not already considered pressed by this (focused) window
+                socket.emit('playerRacingInput', {
+                    roomCode,
+                    carId: myCarIdRef.current,
+                    inputKey: e.key,
+                    pressed: true
                 });
             }
+            keysPressed.current[e.key] = true; // Mark as pressed for this (focused) window for game keys
         }
-        keysPressed.current[e.key] = true;
     }, [socket, roomCode, gameOver, gameStarted]);
 
     const handleKeyUp = useCallback((e) => {
-        if (!isControllingCarRef.current || !myCarIdRef.current) return;
-        if (['ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        // Conditions for this window to ACTUALLY control its assigned car
+        if (gameOver || !gameStarted || !isControllingCarRef.current || !myCarIdRef.current) {
+            return; // This window isn't supposed to control a car, or game isn't ready/active
+        }
+
+        const isGameKey = ['ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key);
+
+        if (isGameKey) {
+            // Only emit and change keysPressed if this window thought the key was pressed
             if (keysPressed.current[e.key]) {
-                socket.emit('playerRacingInput', { 
-                    roomCode, 
-                    carId: myCarIdRef.current, 
-                    inputKey: e.key, 
-                    pressed: false 
+                socket.emit('playerRacingInput', {
+                    roomCode,
+                    carId: myCarIdRef.current,
+                    inputKey: e.key,
+                    pressed: false
                 });
             }
+            keysPressed.current[e.key] = false; // Mark as not pressed for this window for game keys
         }
-        keysPressed.current[e.key] = false;
-    }, [socket, roomCode]);
+    }, [socket, roomCode, gameOver, gameStarted]);
 
     const handleWindowBlur = useCallback(() => {
         if (!isControllingCarRef.current || !myCarIdRef.current || !socket) {
@@ -290,13 +311,43 @@ const RacingGame = ({ teams, onGameEnd, myName, winningNumber: officialWinningNu
         ctx.stroke(trackSurfacePath); 
         if (R_IN > 0 && innerPath) { ctx.stroke(innerPath); }
         cars.forEach(car => {
-            ctx.save(); ctx.translate(car.x, car.y); ctx.rotate(car.angle);
+            const isOnTrack = isPointOnTrackSurface(car.x, car.y);
+
+            if (car.isPlayer && isControllingCarRef.current && socket) {
+                if (!isOnTrack && !hasReportedOffTrackRef.current) {
+                    console.log('Player car off track, notifying server...');
+                    socket.emit('playerOffTrack', { roomCode, carId: myCarIdRef.current });
+                    hasReportedOffTrackRef.current = true;
+                } else if (isOnTrack && hasReportedOffTrackRef.current) {
+                    hasReportedOffTrackRef.current = false; // Reset when back on track
+                }
+            }
+
+            ctx.save();
+            ctx.translate(car.x, car.y);
+            ctx.rotate(car.angle);
+
+            if (!isOnTrack) {
+                ctx.globalAlpha = 0.5; // Make car semi-transparent if off-track
+            }
+
             ctx.fillStyle = car.color || '#CCCCCC'; 
-            ctx.fillRect(-CAR_WIDTH / 2, -CAR_HEIGHT / 2, CAR_WIDTH, CAR_HEIGHT);
-            if (car.isPlayer) { ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5; ctx.strokeRect(-CAR_WIDTH / 2, -CAR_HEIGHT / 2, CAR_WIDTH, CAR_HEIGHT); }
-            else {ctx.strokeStyle = '#777'; ctx.lineWidth = 1; ctx.strokeRect(-CAR_WIDTH / 2, -CAR_HEIGHT / 2, CAR_WIDTH, CAR_HEIGHT); }
-            ctx.fillStyle = '#1A1A1A'; 
-            ctx.fillRect(-CAR_WIDTH/2 + 3, -CAR_HEIGHT/2 + 2, CAR_WIDTH - 6, CAR_HEIGHT/4); 
+            ctx.fillRect(-CAR_HEIGHT / 2, -CAR_WIDTH / 2, CAR_HEIGHT, CAR_WIDTH);
+            if (car.isPlayer) { 
+                ctx.strokeStyle = '#FFFFFF'; 
+                ctx.lineWidth = 2.5; 
+                ctx.strokeRect(-CAR_HEIGHT / 2, -CAR_WIDTH / 2, CAR_HEIGHT, CAR_WIDTH);
+            } else {
+                ctx.strokeStyle = '#777'; 
+                ctx.lineWidth = 1; 
+                ctx.strokeRect(-CAR_HEIGHT / 2, -CAR_WIDTH / 2, CAR_HEIGHT, CAR_WIDTH);
+            }
+            
+            ctx.fillStyle = '#AACCFF';
+            const windshieldWidth = CAR_WIDTH - 6 > 0 ? CAR_WIDTH - 6 : 2;
+            const windshieldLength = CAR_HEIGHT / 3;
+            ctx.fillRect(CAR_HEIGHT / 2 - windshieldLength, -windshieldWidth / 2, windshieldLength, windshieldWidth);
+            
             ctx.restore();
         });
     }, [cars, gameStarted, gameOver]);
