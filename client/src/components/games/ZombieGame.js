@@ -203,8 +203,10 @@ const ZombieGame = ({ teams, onGameEnd, myName, winningNumber: officialWinningNu
 
         // Renaming for clarity and specificity
         const handleInitialZombieGameState = (data) => {
-            console.log('[ZombieGame] Received INITIAL_ZOMBIE_GAME_STATE:', data);
-            setPlayers(data.players?.map(p => ({...p, isPlayer: p.id === myName})) || []);
+            console.log('[ZombieGame] Received INITIAL_ZOMBIE_GAME_STATE raw data:', JSON.stringify(data, null, 2)); // Added log for raw data
+            const processedPlayers = data.players?.map(p => ({...p, isPlayer: p.id === myName})) || [];
+            console.log('[ZombieGame Client] Processed players state on initial load:', JSON.stringify(processedPlayers, null, 2)); // Added log for processed players
+            setPlayers(processedPlayers);
             setZombies(data.zombies || []);
             setOilSlicks(data.oilSlicks || []);
             setBuildings(data.buildings || [ // Default buildings if server doesn't send
@@ -227,7 +229,11 @@ const ZombieGame = ({ teams, onGameEnd, myName, winningNumber: officialWinningNu
         
         const handleZombieGameStateUpdate = (data) => {
             // console.log('[ZombieGame] Received ZOMBIE_GAME_STATE_UPDATE:', data);
-            if (data.players) setPlayers(data.players.map(p => ({...p, isPlayer: p.id === myName})));
+            if (data.players) {
+                const updatedPlayers = data.players.map(p => ({...p, isPlayer: p.id === myName}));
+                // console.log('[ZombieGame Client] Processed players state on update:', JSON.stringify(updatedPlayers, null, 2)); // Optional log for updates
+                setPlayers(updatedPlayers);
+            }
             if (data.zombies) setZombies(data.zombies);
             if (data.oilSlicks) setOilSlicks(data.oilSlicks);
             if (data.helicopterPosition) setHelicopterPosition(data.helicopterPosition);
@@ -258,9 +264,8 @@ const ZombieGame = ({ teams, onGameEnd, myName, winningNumber: officialWinningNu
             if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
             
             if (onGameEnd) {
-                // Assuming data.survivors is an array of player objects {id, name, ...}
-                const survivorIds = data.survivors ? data.survivors.map(s => s.id) : [];
-                onGameEnd(survivorIds.length > 0 ? survivorIds : null); // Pass survivor IDs or null
+                // Use the winningTeamVote from the server payload
+                onGameEnd(data.winningTeamVote || null); 
             }
         };
         

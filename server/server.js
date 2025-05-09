@@ -84,10 +84,9 @@ const ZOMBIE_OIL_SLICK_DURATION = 5000; // 5 seconds
 const ZOMBIE_OIL_SLICK_COOLDOWN = 10000; // 10 seconds
 const ZOMBIE_MAX_PLAYER_OIL_SLICKS = 3;
 const ZOMBIE_COUNTDOWN_SECONDS_INIT = 5; // Initial countdown for the game
-const ZOMBIE_PLAYER_SPEED = 2;
-const ZOMBIE_DEFAULT_SPEED = 0.75; // Average zombie speed
+const ZOMBIE_PLAYER_SPEED = 3; // Increased from 2
+const ZOMBIE_DEFAULT_SPEED = 1.1; // Increased from 0.75
 const ZOMBIE_SLOW_DURATION = 2000; // 2 seconds
-const ZOMBIE_SLOW_FACTOR = 0.4;
 
 const ZOMBIE_HELICOPTER_ANIMATION_SPEED = 1.5;
 const ZOMBIE_HELICOPTER_ANIMATION_TARGET_X = ZOMBIE_CANVAS_WIDTH / 2;
@@ -702,6 +701,7 @@ io.on('connection', (socket) => {
         });
     }
 
+    console.log('[ZombieGame Server] Initial players state before emit:', JSON.stringify(gameState.players, null, 2));
     io.to(roomCode).emit('INITIAL_ZOMBIE_GAME_STATE', getClientSafeZombieState(gameState, roomCode));
 
     if (gameState.gameLoopIntervalId) {
@@ -816,6 +816,7 @@ io.on('connection', (socket) => {
             });
         }
 
+        console.log('[ZombieGame Server] Initial players state before emit:', JSON.stringify(gameState.players, null, 2));
         io.to(roomCode).emit('INITIAL_ZOMBIE_GAME_STATE', getClientSafeZombieState(gameState, roomCode));
         if (gameState.gameLoopIntervalId) clearInterval(gameState.gameLoopIntervalId);
         gameState.gameLoopIntervalId = setInterval(() => zombieGameLoop(roomCode), ZOMBIE_SERVER_TICK_RATE);
@@ -827,7 +828,61 @@ io.on('connection', (socket) => {
     }
   });
   
-  // --- END ZOMBIE GAME HANDLERS ---
+  socket.on('requestNextRound', ({ roomCode }) => {
+    const room = rooms[roomCode];
+    if (room) {
+      console.log(`Next round requested for room ${roomCode} by ${socket.id}`);
+
+      // Clear any active game loops and reset game states
+      if (room.racingGameState && room.racingGameState.gameLoopIntervalId) {
+        clearInterval(room.racingGameState.gameLoopIntervalId);
+      }
+      room.racingGameState = {
+        isActive: false, cars: [], gameLoopIntervalId: null, pendingInputs: {}
+      };
+
+      if (room.pongGameState && room.pongGameState.gameLoopIntervalId) {
+        clearInterval(room.pongGameState.gameLoopIntervalId);
+      }
+      room.pongGameState = {
+        isActive: false, ball: { x: PONG_CANVAS_WIDTH / 2, y: PONG_CANVAS_HEIGHT / 2, dx: 0, dy: 0 },
+        paddles: {}, players: { teamA: null, teamB: null }, gameLoopIntervalId: null, countdown: 0
+      };
+
+      if (room.zombieGameState && room.zombieGameState.gameLoopIntervalId) {
+        clearInterval(room.zombieGameState.gameLoopIntervalId);
+      }
+      room.zombieGameState = {
+        isActive: false, gameStarted: false, gameOver: false, countdown: 0,
+        players: [], zombies: [], oilSlicks: [],
+        buildings: [...ZOMBIE_DEFAULT_BUILDINGS], // Reset buildings to default
+        helicopterPosition: { x: ZOMBIE_HELICOPTER_X, y: ZOMBIE_HELICOPTER_Y },
+        isHelicopterAnimating: false, gameMessage: '',
+        gameLoopIntervalId: null, pendingActions: {}
+      };
+
+      // Reset poker state for the room
+      room.votesByName = {};
+      room.revealed = false;
+      room.winningNumber = null;
+      room.currentRound += 1;
+
+      // Clear individual user votes
+      for (const id in room.users) {
+        if (room.users[id] && room.users[id].hasOwnProperty('vote')) {
+          delete room.users[id].vote;
+        }
+      }
+
+      io.to(roomCode).emit('startNextRound', { 
+        round: room.currentRound,
+        itemVotes: room.itemVotes // Send back all item votes, client might use this for history
+      });
+      console.log(`Room ${roomCode} advanced to round ${room.currentRound}`);
+    } else {
+      console.log(`requestNextRound: Room ${roomCode} not found.`);
+    }
+  });
 
   socket.on('playerRacingInput', ({ roomCode, carId, inputKey, pressed }) => {
     const room = rooms[roomCode];
@@ -1250,13 +1305,21 @@ function zombieGameLoop(roomCode) {
         gameState.gameOver = true;
         gameState.isActive = false; // Stop further processing in this loop iteration
         const survivors = gameState.players.filter(p => p.safe);
+        let winningTeamVote = null;
+
         if (survivors.length > 0) {
             gameState.gameMessage = `Survivors: ${survivors.map(s => s.name).join(', ')} made it!`;
+            // Assuming all survivors are from the same winning team or first survivor's team vote counts
+            winningTeamVote = survivors[0].teamVote; 
         } else {
             gameState.gameMessage = 'The zombies got everyone!';
         }
         
-        io.to(roomCode).emit('ZOMBIE_GAME_OVER', { message: gameState.gameMessage, survivors: survivors.map(s => ({id: s.id, name: s.name})) });
+        io.to(roomCode).emit('ZOMBIE_GAME_OVER', { 
+            message: gameState.gameMessage, 
+            survivors: survivors.map(s => ({id: s.id, name: s.name, teamVote: s.teamVote})), // Include teamVote for clarity if needed client side
+            winningTeamVote: winningTeamVote // Crucial for PointingPoker
+        });
         
         if (gameState.gameLoopIntervalId) {
             clearInterval(gameState.gameLoopIntervalId);
